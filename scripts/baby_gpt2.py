@@ -9,6 +9,7 @@ from transformers import AutoTokenizer
 from transformers import DataCollatorForLanguageModeling
 from transformers import GPT2Config, GPT2LMHeadModel
 from transformers import TrainingArguments, Trainer
+from transformers import GPTNeoXForCausalLM, GPTNeoXConfig
 # custom scripts
 from eval import Evaluation
 
@@ -241,16 +242,24 @@ def main():
   all models use the same training arguments and evaluation
   '''
   #------------------ PARAMETERS ------------------#
-  nt_model_path = './models/gpt-2-warm-up/standard-gpt/nt-model'
-  nsp_model_path = './models/gpt-2-warm-up/standard-gpt/nsp-model'  
-  nup_model_path = './models/gpt-2-warm-up/standard-gpt/nup-model'
-
+  data_collator = DataCollatorForLanguageModeling(tokenizer,mlm=False)
+  # data paths
   nt_data_path = './data/nt_text.txt'
   nsp_data_path = './data/nsp_text.jsonl'
   nup_data_path = './data/nup_text.jsonl'
+  # model paths
+  nt_model_path = './models/gpt-2-warm-up/standard-gpt/nt-model' 
+  nsp_model_path = './models/gpt-2-warm-up/standard-gpt/nsp-model'  
+  nup_model_path = './models/gpt-2-warm-up/standard-gpt/nup-model'
   tokenizer = AutoTokenizer.from_pretrained("gpt2")
-  data_collator = DataCollatorForLanguageModeling(tokenizer,mlm=False)
   output_dir='gpt-2-warm-up/standard-gpt'
+
+  # pythia
+  # nt_model_path = './models/pythia/nt-model'
+  # nsp_model_path = './models/pythia/nsp-model'
+  # nup_model_path = './models/pythia/nup-model'
+  # tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-160m")
+  # output_dir = 'pythia/standard-pythia'
 
   # training arguments
   training_args = TrainingArguments(output_dir=output_dir,
@@ -287,6 +296,10 @@ def main():
         # Load randomized model for next token prediction
         configuration = GPT2Config()
         model = GPT2LMHeadModel(configuration)
+
+        # configuration = AutoConfig.from_pretrained("EleutherAI/pythia-160m")
+        # model = GPTNeoXForCausalLM(configuration) 
+        # model.apply(model._init_weights)
         
         # Generate NT data
         data = make_nt_data(data_path, tokenizer)
@@ -297,6 +310,7 @@ def main():
     elif task_type == 'next_sentence':
         # Load pre-trained NT model for next sentence prediction
         model = GPT2LMHeadModel.from_pretrained(nt_model_path)
+        # model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
         
         # Generate NSP data
         train_dataset, eval_dataset = make_nsp_data(data_path, model, max_length, tokenizer)
@@ -305,6 +319,7 @@ def main():
     elif task_type == 'next_utterance':
         # Load pre-trained NT model for next utterance prediction
         model = GPT2LMHeadModel.from_pretrained(nt_model_path)
+        # model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
         
         # Generate NUP data (using same function as NSP)
         train_dataset, eval_dataset = make_nsp_data(data_path, model, max_length, tokenizer)
@@ -324,6 +339,7 @@ def main():
     
     # Load trained model and evaluate
     trained_model = GPT2LMHeadModel.from_pretrained(save_path)
+    # trained_model = GPTNeoXForCausalLM.from_pretrained(save_path)
     evaluation = Evaluation(trained_model, tokenizer, eval_results)
     evaluation.eval()
     
