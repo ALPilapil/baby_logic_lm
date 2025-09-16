@@ -12,10 +12,6 @@ from transformers import TrainingArguments, Trainer
 # custom scripts
 from eval import Evaluation
 
-#-----------------------------------------------#
-#----------------- NEXT TOKEN ------------------#
-#-----------------------------------------------#
-
 #--------------- DATA PREP ---------------#
 def clean_data(text):
   '''
@@ -67,7 +63,6 @@ def concat(examples):
     examples["input_ids"]=[list(chain.from_iterable(examples['input_ids']))] # convert chain to list of tokens
     examples["attention_mask"]=[list(chain.from_iterable(examples['attention_mask']))] # convert chain to list of tokens
     return examples
-
 
 def make_nt_data(data_path, tokenizer):
   '''
