@@ -1,6 +1,8 @@
 import re
 from itertools import chain
 import json
+import csv
+import os
 #from hf
 from datasets import Dataset, DatasetDict
 from transformers import AutoTokenizer
@@ -18,6 +20,7 @@ from eval import Evaluation
 def clean_data(text):
   '''
   given the childes.train data remove the speaker tags and anything in []
+  which indicate annotations
   '''
   # Split text into lines for processing
   lines = text.strip().split('\n')
@@ -67,6 +70,10 @@ def concat(examples):
 
 
 def make_nt_data(data_path, tokenizer):
+  '''
+  turns the childes data into a train and eval dataset that can be passed into 
+  training a model
+  '''
   #--------------- DATA PREP ---------------#
   # load in the data
   with open(data_path, 'r') as file:
@@ -108,6 +115,9 @@ def make_jsonl_list(file_path):
         return [json.loads(line.strip()) for line in file if line.strip()]
 
 def make_nsp_data(file_path, nt_model, max_length, tokenizer):
+  '''
+  makes nsp OR nup data by making pairs out of the childes text file
+  '''
   pairs = make_jsonl_list('./data/nsp_text.jsonl')
   raw = Dataset.from_list(pairs)
   ds = DatasetDict({"train": raw, "validation": raw.select(range(1))})
@@ -175,6 +185,11 @@ def train(model,
           save_model_path,
           training_args,
           ):
+  '''
+  general purpose train function that takes a model, tokenizer, training and test dataset
+  collator and a path to save the trained model along with the actual model config
+  can be used to train all 3 models
+  '''
 
   tokenizer.pad_token = tokenizer.eos_token
 
@@ -194,6 +209,37 @@ def train(model,
 
   return eval_results
 
+def save_results(evaluation, filename, task):
+   '''
+   given an evaluation results class object save these to a csv
+   '''
+   # Prepare the results data
+   results = {
+        'task_type': task,
+        'CEL': evaluation.CEL,
+        'perplexity': evaluation.perplexity,
+        'CN': evaluation.CN,
+        'BLiMP': evaluation.blimp,
+        'CoLA': evaluation.cola
+    }
+    
+   # Check if file exists to determine if we need headers
+   file_exists = os.path.exists(filename)
+    
+    # Write to CSV
+   with open(filename, 'a', newline='') as csvfile:
+        fieldnames = ['timestamp', 'task_type', 'CEL', 'perplexity', 'CN', 'BLiMP', 'CoLA']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        
+        # Write header if file is new
+        if not file_exists:
+            writer.writeheader()
+        
+        # Write the results
+        writer.writerow(results)
+
+   print(f"Results saved to {filename}")
+
 def main():
   '''
   has parameters for where to save the 3 models, train them, and evaluate them
@@ -203,6 +249,10 @@ def main():
   nt_model_path = './models/gpt-2-warm-up/standard-gpt/nt-model'
   nsp_model_path = './models/gpt-2-warm-up/standard-gpt/nsp-model'  
   nup_model_path = './models/gpt-2-warm-up/standard-gpt/nup-model'
+
+  nt_data_path = './data/nt_text.txt'
+  nsp_data_path = './data/nsp_text.jsonl'
+  nup_data_path = './data/nup_text.jsonl'
   tokenizer = AutoTokenizer.from_pretrained("gpt2")
   data_collator = DataCollatorForLanguageModeling(tokenizer,mlm=False)
   output_dir='gpt-2-warm-up/standard-gpt'
@@ -227,90 +277,80 @@ def main():
                                     report_to='wandb',
                                   )
 
-  #------------------ NEXT TOKEN PREDICTION ------------------#
-  def next_token():
-    # load the randomized model
-    configuration = GPT2Config()
-    base_model =GPT2LMHeadModel(configuration)
+  #------------------ train and evaluate ------------------#
+  def train_and_evaluate(task_type, data_path, max_length=256):
+    """
+    Train and evaluate a model for different prediction tasks.
+    
+    Args:
+        task_type (str): 'next_token', 'next_sentence', or 'next_utterance'
+        data_path (str): Path to the training data
+        max_length (int): Maximum sequence length for NSP/NUP tasks
+    """
+    
+    if task_type == 'next_token':
+        # Load randomized model for next token prediction
+        configuration = GPT2Config()
+        model = GPT2LMHeadModel(configuration)
+        
+        # Generate NT data
+        data = make_nt_data(data_path, tokenizer)
+        train_dataset = data["train"]
+        eval_dataset = data["test"]
+        save_path = nt_model_path
+        
+    elif task_type == 'next_sentence':
+        # Load pre-trained NT model for next sentence prediction
+        model = GPT2LMHeadModel.from_pretrained(nt_model_path)
+        
+        # Generate NSP data
+        train_dataset, eval_dataset = make_nsp_data(data_path, model, max_length, tokenizer)
+        save_path = nsp_model_path
+        
+    elif task_type == 'next_utterance':
+        # Load pre-trained NT model for next utterance prediction
+        model = GPT2LMHeadModel.from_pretrained(nt_model_path)
+        
+        # Generate NUP data (using same function as NSP)
+        train_dataset, eval_dataset = make_nsp_data(data_path, model, max_length, tokenizer)
+        save_path = nup_model_path
+        
+    else:
+        raise ValueError("task_type must be 'next_token', 'next_sentence', or 'next_utterance'")
+    
+    # Train the model
+    eval_results = train(model=model,
+                        tokenizer=tokenizer,
+                        train_dataset=train_dataset,
+                        eval_dataset=eval_dataset,
+                        data_collator=data_collator,
+                        save_model_path=save_path,
+                        training_args=training_args)
+    
+    # Load trained model and evaluate
+    trained_model = GPT2LMHeadModel.from_pretrained(save_path)
+    evaluation = Evaluation(trained_model, tokenizer, eval_results)
+    evaluation.eval()
+    
+    # Print results
+    print(f"=== {task_type.upper().replace('_', ' ')} RESULTS ===")
+    print(f"CEL: {evaluation.CEL}")
+    print(f"Perplexity: {evaluation.perplexity}")
+    print(f"CN: {evaluation.CN}")
+    print(f"BLiMP: {evaluation.blimp}")
+    print(f"CoLA: {evaluation.cola}")
+    
+    return evaluation
 
-    # generate the nt data
-    nt_data = make_nt_data('./data/nt_text.txt', tokenizer)
+  # Define what to run here
+  # next_token = train_and_evaluate('next_token', nt_data_path)
+  # next_sentence = train_and_evaluate('next_sentence', nsp_data_path)
+  next_utterance = train_and_evaluate('next_utterance', nup_data_path)
 
-    # train the model
-    nt_results = train(model=base_model,
-                          tokenizer=tokenizer,
-                          train_dataset=nt_data["train"],
-                          eval_dataset=nt_data["test"],
-                          data_collator=data_collator,
-                          save_model_path=nt_model_path,
-                          training_args=training_args,
-                          )
+  # save the results
+  # results_path = './training_results'
+  # save_results(next_token, results_path, 'next_token')
 
-    # testing the model after training is done
-    nt_model = GPT2LMHeadModel.from_pretrained(nt_model_path)
-    print(nt_model)
-
-    # evaluate model
-    nt_evaluation = Evaluation(nt_model, tokenizer, nt_results)
-    nt_evaluation.eval()
-    print(f"CEL: {nt_evaluation.CEL}")
-    print(f"Perplexity: {nt_evaluation.perplexity}")
-    print(f"CN: {(nt_evaluation.CN)}")
-    print(f"BLiMP: {nt_evaluation.blimp}")
-    print(f"CoLA: {nt_evaluation.cola}")
-
-  #------------------ NEXT SENTENCE PREDICTION ------------------#
-  def next_sentence():
-    nt_model = GPT2LMHeadModel.from_pretrained(nt_model_path)
-    # load in data
-    nsp_train, nsp_val = make_nsp_data('./data/nsp_text.jsonl', nt_model, max_length=256, tokenizer=tokenizer)
-
-    # train, note you start with the next token model but save the trained version in the nsp folder
-
-    nsp_eval_results = train(model=nt_model,
-                          tokenizer=tokenizer,
-                          train_dataset=nsp_train,
-                          eval_dataset=nsp_val,
-                          data_collator=data_collator,
-                          save_model_path=nsp_model_path,
-                          training_args=training_args,
-                          )
-    # evaluate nsp
-    nsp_model = GPT2LMHeadModel.from_pretrained(nsp_model_path)
-    nsp_eval = Evaluation(nsp_model, tokenizer, nsp_eval_results)
-    nsp_eval.eval()
-    print(f"CEL: {nsp_eval.CEL}")
-    print(f"Perplexity: {nsp_eval.perplexity}")
-    print(f"CN: {(nsp_eval.CN)}")
-    print(f"BLiMP: {nsp_eval.blimp}")
-    print(f"CoLA: {nsp_eval.cola}")
-
-
-  #------------------ NEXT UTTERANCE PREDICTION ------------------#
-  def next_utterance():
-    nt_model = GPT2LMHeadModel.from_pretrained(nt_model_path)
-    nup_train, nup_val = make_nsp_data('./data/nup_text.jsonl', nt_model, max_length=256, tokenizer=tokenizer)
-
-    # train, note you start with the next token model but save the trained version in the nup folder
-    nup_eval_results = train(model=nt_model,
-                          tokenizer=tokenizer,
-                          train_dataset=nup_train,
-                          eval_dataset=nup_val,
-                          data_collator=data_collator,
-                          save_model_path=nup_model_path,
-                          training_args=training_args,
-                          )
-    # evaluate nsp
-    nup_model = GPT2LMHeadModel.from_pretrained(nup_model_path)
-    nup_eval = Evaluation(nup_model, tokenizer, nup_eval_results)
-    nup_eval.eval()
-    print(f"CEL: {nup_eval.CEL}")
-    print(f"Perplexity: {nup_eval.perplexity}")
-    print(f"CN: {(nup_eval.CN)}")
-    print(f"BLiMP: {nup_eval.blimp}")
-    print(f"CoLA: {nup_eval.cola}")
-
-  next_token()
 
 if __name__ == "__main__":
   main()

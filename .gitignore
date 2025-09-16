@@ -2,3 +2,10 @@
 gpt-2-warm-up/
 models/
 wandb/
+
+# python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
