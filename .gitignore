@@ -3,6 +3,15 @@ gpt-2-warm-up/
 models/
 wandb/
 
+# data
+pre-predata/
+next_token/
+next_sentence/
+next_utterance/
+
+# model stuff
+pythia/
+
 # python cache
 __pycache__/
 *.pyc
