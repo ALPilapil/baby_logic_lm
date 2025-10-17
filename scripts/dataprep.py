@@ -1,7 +1,7 @@
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, load_from_disk, load_dataset
 import re
-from itertools import chain
 import json
+from transformers import AutoTokenizer
 
 #--------------- DATA PREP ---------------#
 def clean_data(text):
@@ -31,99 +31,91 @@ def clean_data(text):
 
   return '\n'.join(cleaned_lines)
 
-def chunk(examples):
-    chunk_size = 1 # modify this accordingly
-    input_ids = examples["input_ids"][0] # List[List], pass the inner list
-    attention_mask = examples["attention_mask"][0] # List[List]
-    input_ids_truncated = []
-    attention_mask_truncated = []
-
-    #slice with step_size=chunk_size
-    for i in range(0,len(input_ids),chunk_size):
-        chunk = input_ids[i:i+chunk_size]
-        if len(chunk)==chunk_size: # drop the last chunk if not equal
-            input_ids_truncated.append(chunk)
-            attention_mask_truncated.append(attention_mask[i:i+chunk_size])
-    examples['input_ids']=input_ids_truncated
-    examples["attention_mask"]=attention_mask_truncated
-
-    return examples
-
-# Make samples to a size of 1024, fast for GPU
-def concat(examples):
-    examples["input_ids"]=[list(chain.from_iterable(examples['input_ids']))] # convert chain to list of tokens
-    examples["attention_mask"]=[list(chain.from_iterable(examples['attention_mask']))] # convert chain to list of tokens
-    return examples
-
-def get_paren_data(data_path, tokenizer):
-    with open(data_path, 'r') as file:
-        paren_data = file.read()
+def compress_data(read_path, save_path, tokenizer):
+    '''
+    More scalable: loads data properly
+    '''
     
-    paren_data = paren_data[:15000]
-    paren_data = paren_data.split("\n")
+    # Load with HuggingFace (more efficient)
+    dataset = load_dataset('text', data_files=read_path, split='train')
+    
+    # Tokenize
+    def tokenize_function(examples):
+        return tokenizer(examples["text"])
 
-    # turn into a dataset
-    dataset = Dataset.from_dict({"text": paren_data})
-    paren_dataset = dataset.train_test_split(test_size=0.01, seed=42)
+    tokenized_data = dataset.map(
+        tokenize_function,
+        batched=True,
+        batch_size=1000,
+        num_proc=1,
+        remove_columns=['text'],
+        keep_in_memory=False,
+        desc="Tokenizing"
+    )
 
-
-    # tokenize
-    def tokenize_function(example):
-        return tokenizer(example["text"])
-
-    tokenized_paren = paren_dataset.map(tokenize_function,batched=True,remove_columns=['text'])
-
-    # # save to disk if required (use load_from_disk latter)
-    # tokenized_ds.save_to_disk('bookcorpus/tokenized_ds')
-
-    # takes a lot of time (worth saving it to disk)
-    concated_ds = tokenized_paren.map(concat,batched=True,batch_size=1,num_proc=8)
-
-    chunked_ds = concated_ds.map(chunk,batched=True,batch_size=2,num_proc=2)
-
-    return chunked_ds
+    # Save to disk
+    split = tokenized_data.train_test_split(test_size=0.1, seed=42)
+    split.save_to_disk(save_path)
+    print(f" Saved to {save_path}")
 
 
-
-def make_nt_data(data_path, tokenizer):
-  '''
-  turns the childes data into a train and eval dataset that can be passed into 
-  training a model
-  '''
-  #--------------- DATA PREP ---------------#
-  # load in the data
-  with open(data_path, 'r') as file:
-    raw_next_token_data = file.read()
-
-  raw_next_token_data = raw_next_token_data[:10000]
-
-  # clean data
-  clean_next_token_data = clean_data(raw_next_token_data)
-  clean_next_token_data = clean_next_token_data.split("\n")
-
-  # turn into a dataset
-  dataset = Dataset.from_dict({"text": clean_next_token_data})
-  next_token_data = dataset.train_test_split(test_size=0.01, seed=42)
-
-
-  # tokenize
-  def tokenize_function(example):
-    return tokenizer(example["text"])
-
-  tokenized_nt_data = next_token_data.map(tokenize_function,batched=True,remove_columns=['text'])
-
-  # # save to disk if required (use load_from_disk latter)
-  # tokenized_ds.save_to_disk('bookcorpus/tokenized_ds')
-
-  # takes a lot of time (worth saving it to disk)
-  concated_ds = tokenized_nt_data.map(concat,batched=True,batch_size=1,num_proc=8)
-
-  chunked_ds = concated_ds.map(chunk,batched=True,batch_size=2,num_proc=2)
-  chunked_ds.save_to_disk('next_token/chunked_ds') # will use this latter for diff experimentation
-
-  return chunked_ds
-
-
+def make_nt_data_chunked_scalable(read_path, save_path, tokenizer, block_size=512):
+    """
+    Fully scalable version
+    """
+    
+    # Load as dataset (more efficient)
+    dataset = load_dataset('text', data_files=read_path, split='train')
+    
+    print(f"Loaded {len(dataset)} lines")
+    
+    # Clean and tokenize in one step
+    def clean_and_tokenize(examples):
+        # Clean each text
+        cleaned_texts = [clean_data(text) for text in examples["text"]]
+        # Tokenize
+        return tokenizer(cleaned_texts, add_special_tokens=False)
+    
+    tokenized = dataset.map(
+        clean_and_tokenize,
+        batched=True,
+        batch_size=1000,
+        num_proc=1,
+        remove_columns=['text'],
+        keep_in_memory=False,  # Important!
+        desc="Cleaning and tokenizing"
+    )
+    
+    # Group into chunks
+    def group_texts(examples):
+        from itertools import chain
+        concatenated = {k: list(chain(*examples[k])) for k in examples.keys()}
+        total_length = len(concatenated['input_ids'])
+        
+        if total_length >= block_size:
+            total_length = (total_length // block_size) * block_size
+        
+        result = {
+            k: [concatenated[k][i:i + block_size] 
+                for i in range(0, total_length, block_size)]
+            for k in concatenated.keys()
+        }
+        return result
+    
+    chunked = tokenized.map(
+        group_texts,
+        batched=True,
+        batch_size=1000,
+        keep_in_memory=False,  # Add this!
+        desc=f"Grouping into {block_size}-token chunks"
+    )
+    
+    print(f"Created {len(chunked)} chunks")
+    
+    split = chunked.train_test_split(test_size=0.1, seed=42)
+    split.save_to_disk(save_path)
+    
+    return split
 #-----------------------------------------------#
 #----------- NEXT SENTENCE/UTTERANCE -----------#
 #-----------------------------------------------#
@@ -131,64 +123,141 @@ def make_jsonl_list(file_path):
   with open(file_path, 'r', encoding='utf-8') as file:
         return [json.loads(line.strip()) for line in file if line.strip()]
 
-def make_nsp_data(file_path, nt_model, max_length, tokenizer):
-  '''
-  makes nsp OR nup data by making pairs out of the childes text file
-  '''
-  pairs = make_jsonl_list('./data/nsp_text.jsonl')
-  raw = Dataset.from_list(pairs)
-  ds = DatasetDict({"train": raw, "validation": raw.select(range(1))})
-  tok = tokenizer
-
-  tokenizer.pad_token = tokenizer.eos_token  # GPT-2 has no pad by default
-  nt_model.resize_token_embeddings(len(tokenizer))
-
-  MAX_LEN = max_length
-
-  def build_example(ex):
-    # Format: [s1] <eos> [s2] <eos>
-    text = ex["s1"] + tok.eos_token + ex["s2"] + tok.eos_token
-    x = tok(
-        text,
-        truncation=True,
-        max_length=MAX_LEN,
-        padding='max_length',  # Add padding to max length
-        return_tensors="pt"
+def make_nsp_data(file_path, tokenizer, max_length=512, test_size=0.1):
+    """
+    Scalable version: processes data efficiently for large datasets
+    """
+    from datasets import Dataset
+    
+    # Load pairs
+    pairs = make_jsonl_list(file_path)
+    dataset = Dataset.from_list(pairs)
+    
+    print(f"Loaded {len(dataset)} sentence pairs")
+    
+    # Tokenization function (NO padding here, NO tensors)
+    def tokenize_pair(examples):
+        """
+        Process in batches without padding or converting to tensors
+        """
+        batch_size = len(examples['s1'])
+        input_ids_list = []
+        attention_mask_list = []
+        labels_list = []
+        
+        for i in range(batch_size):
+            # Tokenize s1 and s2 separately
+            s1_tokens = tokenizer(
+                examples['s1'][i],
+                truncation=True,
+                max_length=max_length // 2,  # Leave room for s2
+                add_special_tokens=False
+            )
+            
+            s2_tokens = tokenizer(
+                examples['s2'][i],
+                truncation=True,
+                max_length=max_length // 2,
+                add_special_tokens=False
+            )
+            
+            # Combine: [s1] <eos> [s2] <eos>
+            input_ids = (
+                s1_tokens['input_ids'] + 
+                [tokenizer.eos_token_id] + 
+                s2_tokens['input_ids'] + 
+                [tokenizer.eos_token_id]
+            )
+            
+            # Create attention mask (all 1s, no padding yet)
+            attention_mask = [1] * len(input_ids)
+            
+            # Create labels: mask s1 and first eos, keep s2
+            s1_length = len(s1_tokens['input_ids']) + 1  # +1 for eos
+            labels = [-100] * s1_length + s2_tokens['input_ids'] + [tokenizer.eos_token_id]
+            
+            # Truncate if too long
+            if len(input_ids) > max_length:
+                input_ids = input_ids[:max_length]
+                attention_mask = attention_mask[:max_length]
+                labels = labels[:max_length]
+            
+            input_ids_list.append(input_ids)
+            attention_mask_list.append(attention_mask)
+            labels_list.append(labels)
+        
+        return {
+            'input_ids': input_ids_list,
+            'attention_mask': attention_mask_list,
+            'labels': labels_list
+        }
+    
+    # Process in batches (MUCH faster)
+    processed = dataset.map(
+        tokenize_pair,
+        batched=True,
+        batch_size=1000,  # Process 1000 examples at a time
+        remove_columns=['s1', 's2'],
+        num_proc=1,  # Can increase if you have more CPU cores
+        keep_in_memory=False,
+        desc="Tokenizing pairs"
     )
-    input_ids = x["input_ids"][0]
-    attn = x["attention_mask"][0]
+    
+    # Split train/test properly
+    split = processed.train_test_split(test_size=test_size, seed=42)
+    
+    print(f"Train: {len(split['train'])} examples")
+    print(f"Test: {len(split['test'])} examples")
+    
+    return split['train'], split['test']
 
-    # Find the FIRST eos (end of s1). We inserted one between s1 and s2.
-    eos_positions = (input_ids == tok.eos_token_id).nonzero(as_tuple=False)
-    if eos_positions.numel() == 0:
-        # If truncated before the first EOS, skip this example by returning None-like (we'll filter later)
-        return {"drop": True}
+def preprocess_nsp_and_save(input_file, output_dir, tokenizer, max_length=512):
+    """
+    Preprocess once and save to disk
+    """
+    train_dataset, test_dataset = make_nsp_data(
+        input_file,
+        tokenizer,
+        max_length,
+        test_size=0.1
+    )
+    
+    # Save processed data
+    from datasets import DatasetDict
+    dataset_dict = DatasetDict({
+        'train': train_dataset,
+        'test': test_dataset
+    })
+    
+    dataset_dict.save_to_disk(output_dir)
+    print(f"Saved to {output_dir}")
+    
+    return dataset_dict
 
-    first_eos_idx = eos_positions[0].item()
 
-    labels = input_ids.clone()
-    labels[:first_eos_idx + 1] = -100  # ignore s1 + its EOS; learn only on s2 tokens
+if __name__ == "__main__":
+  model_id = "EleutherAI/pythia-70m"
+  tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
+  # make_paren_data()
+  paren_read_path = './pre-predata/tokenized_paren/tokenized_paren.txt'
+  paren_save_path = './pre-predata/tokenized_paren'
+  compress_data(read_path=paren_read_path, save_path=paren_save_path, tokenizer=tokenizer)
 
-    # Also mask padding tokens in labels
-    labels[attn == 0] = -100
+  # this also saves it
+  nt_data = make_nt_data_chunked_scalable('./data/childes.train', './data/nt_dataset', tokenizer)
 
-    return {
-        "input_ids": input_ids,
-        "attention_mask": attn,
-        "labels": labels,
-        "drop": False
-    }
+  preprocess_nsp_and_save(
+    './data/nsp_text.jsonl',
+    './data/nsp_dataset',
+    tokenizer
+  )
 
-  # preprocess, note max len is defined in build example
-  proc_train = ds["train"].map(build_example)
-  proc_val   = ds["validation"].map(build_example)
+  preprocess_nsp_and_save(
+    './data/nup_text.jsonl',
+    './data/nup_dataset',
+    tokenizer
+  )
 
-  # Drop any truncated/bad rows if they occurred
-  proc_train = proc_train.filter(lambda ex: not ex["drop"])
-  proc_val   = proc_val.filter(lambda ex: not ex["drop"])
+  
+  
 
-  # Remove the helper column and original text columns
-  proc_train = proc_train.remove_columns(["drop", "s1", "s2"])
-  proc_val   = proc_val.remove_columns(["drop", "s1", "s2"])
-
-  return proc_train, proc_val

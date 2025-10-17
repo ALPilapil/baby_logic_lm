@@ -5,10 +5,9 @@ from transformers import AutoTokenizer
 from transformers import DataCollatorForLanguageModeling
 from transformers import TrainingArguments, Trainer
 from transformers import GPTNeoXForCausalLM, AutoConfig
+from datasets import load_from_disk
 # custom scripts
 from eval import Evaluation
-from dataprep import make_nt_data, make_nsp_data, get_paren_data
-
 
 # General function to use for all 3 models
 def train(model,
@@ -91,7 +90,7 @@ def main():
   nsp_model_path = './models/pythia/nsp-model'
   nup_model_path = './models/pythia/nup-model'
   model_id = "EleutherAI/pythia-70m"
-  tokenizer = AutoTokenizer.from_pretrained(model_id)
+  tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
   output_dir = 'pythia/standard-pythia'
 
   data_collator = DataCollatorForLanguageModeling(tokenizer,mlm=False)
@@ -136,18 +135,18 @@ def main():
         model.resize_token_embeddings(len(tokenizer))
         model.apply(model._init_weights)
 
-        data = get_paren_data(data_path, tokenizer)
-        train_dataset = data["train"]
-        eval_dataset = data["test"]
+        dataset = load_from_disk('./pre-predata/tokenized_paren')
+        train_dataset = dataset['train']
+        eval_dataset = dataset['test']
         save_path = pre_model_path
 
     elif task_type == 'next_token':
         model = GPTNeoXForCausalLM.from_pretrained(pre_model_path)
         
         # Generate NT data
-        data = make_nt_data(data_path, tokenizer)
-        train_dataset = data["train"]
-        eval_dataset = data["test"]
+        dataset = load_from_disk('./data/nt_dataset')
+        train_dataset = dataset['train']
+        eval_dataset = dataset['test']
         save_path = nt_model_path
         
     elif task_type == 'next_sentence':
@@ -155,7 +154,9 @@ def main():
         model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
         
         # Generate NSP data
-        train_dataset, eval_dataset = make_nsp_data(data_path, model, max_length, tokenizer)
+        dataset = load_from_disk('./data/nsp_dataset')
+        train_dataset = dataset['train']
+        eval_dataset = dataset['test']
         save_path = nsp_model_path
         
     elif task_type == 'next_utterance':
@@ -163,11 +164,17 @@ def main():
         model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
         
         # Generate NUP data (using same function as NSP)
-        train_dataset, eval_dataset = make_nsp_data(data_path, model, max_length, tokenizer)
+        dataset = load_from_disk('./data/nup_dataset')
+        train_dataset = dataset['train']
+        eval_dataset = dataset['test']
         save_path = nup_model_path
         
     else:
         raise ValueError("task_type must be 'next_token', 'next_sentence', or 'next_utterance'")
+    
+    # do not evaluate anything for pre pre training
+    if task_type == 'pre-pre':
+       return 
     
     # Train the model
     eval_results = train(model=model,
@@ -181,8 +188,6 @@ def main():
     # Load trained model and evaluate
     trained_model = GPTNeoXForCausalLM.from_pretrained(save_path)
     evaluation = Evaluation(trained_model, tokenizer, eval_results)
-    if task_type == 'pre-pre':
-       return evaluation
        
     evaluation.eval()
 

@@ -2,23 +2,33 @@
 Account for the parentheses language
 Do this by creating a unique string in special token format, so <f{i}> for example,
 Then for each of these unique strings add them to the model tokenizer
-pass this tokenizer back
+save this tokenizer somewhere
 '''
 from transformers import AutoTokenizer
-import re
 
 # load in the data
 def load_paren(file_path):
-    content = ''
+    '''
+    Memory-efficient version: extracts unique numbers without loading entire file
+    '''
+    unique_nums = set()
+    
     try:
         with open(file_path, 'r') as file:
-            content = file.read()
+            for line in file:
+                tokens = line.split()
+                for token in tokens:
+                    try:
+                        unique_nums.add(int(token))
+                    except ValueError:
+                        continue
     except FileNotFoundError:
         print(f"Error: The file '{file_path}' was not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
-
-    return content
+    
+    # Return as space-separated string to maintain compatibility
+    return ' '.join(map(str, sorted(unique_nums)))
 
 
 # generate unique strings for each integer
@@ -46,7 +56,6 @@ def paren_tokenizer(tokenizer=None):
     # load in the data
     paren_data_path = "pre-predata/shuff_dyck/dyck_sequences.txt"
     raw_paren_data = load_paren(paren_data_path)
-    raw_paren_data = raw_paren_data[:100]
 
     # generate unique strings for each integer
     unique_strings = string_conversion(raw_paren_data)
@@ -54,8 +63,11 @@ def paren_tokenizer(tokenizer=None):
     # add new strings to tokenizer
     num = tokenizer.add_special_tokens({"additional_special_tokens": unique_strings})
 
-    # convert the dataset into strings
-    # converted_paren_data = re.sub(r'\b(\d+)\b', r'<\1>', raw_paren_data)
-    
-    return num
+    # save the tokenizer somwhere
+    save_path = "tokenizers/paren_tokenizer"
+    tokenizer.save_pretrained(save_path)
 
+if __name__ == "__main__":
+    model_id = "EleutherAI/pythia-70m"
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    paren_tokenizer(tokenizer)
