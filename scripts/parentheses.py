@@ -44,7 +44,7 @@ def string_conversion(paren_data):
 
 def paren_tokenizer(tokenizer=None):
     # load in the data
-    paren_data_path = "pre-predata/shuff_dyck/dyck_sequences_cross_serial_64_0.51.txt"
+    paren_data_path = "pre-predata/shuff_dyck/dyck_sequences.txt"
     raw_paren_data = load_paren(paren_data_path)
     raw_paren_data = raw_paren_data[:100]
 
@@ -58,17 +58,4 @@ def paren_tokenizer(tokenizer=None):
     # converted_paren_data = re.sub(r'\b(\d+)\b', r'<\1>', raw_paren_data)
     
     return num
-
-def make_paren_data():
-    '''
-    one time use function 
-    '''
-    paren_data_path = "pre-predata/shuff_dyck/dyck_sequences_cross_serial_64_0.51.txt"
-    raw_paren_data = load_paren(paren_data_path)
-    raw_paren_data = raw_paren_data[:150000]
-    converted_paren_data = re.sub(r'\b(\d+)\b', r'<\1>', raw_paren_data)
-    with open("pre-predata/tokenized_paren/tokenized_paren.txt", "w") as file:
-        file.write(converted_paren_data)
-
-make_paren_data()
 

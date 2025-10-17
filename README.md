@@ -9,3 +9,7 @@ We utilize pre pretraining on data containing a hierarchical format. After that 
 
 ## Self note
 All the functions currently are truncated
+
+## Instructions
+Generate dyck_sequences with python scripts/make_paren_data.py which takes an optional argument to limit the amount generated
+

@@ -7,8 +7,7 @@ from transformers import TrainingArguments, Trainer
 from transformers import GPTNeoXForCausalLM, AutoConfig
 # custom scripts
 from eval import Evaluation
-from parentheses import paren_tokenizer
-from dataprep import clean_data, chunk, concat, make_nt_data, make_jsonl_list, make_nsp_data, make_paren_data
+from dataprep import make_nt_data, make_nsp_data, get_paren_data
 
 
 # General function to use for all 3 models
@@ -126,6 +125,8 @@ def main():
         task_type (str): 'pre-pre', 'next_token', 'next_sentence', or 'next_utterance'
         data_path (str): Path to the training data
         max_length (int): Maximum sequence length for NSP/NUP tasks
+
+    returns the results for evaluation
     """
     if task_type == 'pre_pretrain':
        # Load randomized model for next token prediction
@@ -135,7 +136,7 @@ def main():
         model.resize_token_embeddings(len(tokenizer))
         model.apply(model._init_weights)
 
-        data = make_paren_data(data_path, tokenizer)
+        data = get_paren_data(data_path, tokenizer)
         train_dataset = data["train"]
         eval_dataset = data["test"]
         save_path = pre_model_path
@@ -184,15 +185,7 @@ def main():
        return evaluation
        
     evaluation.eval()
-    
-    # Print results
-    # print(f"=== {task_type.upper().replace('_', ' ')} RESULTS ===")
-    # print(f"CEL: {evaluation.CEL}")
-    # print(f"Perplexity: {evaluation.perplexity}")
-    # print(f"CN: {evaluation.CN}")
-    # print(f"BLiMP: {evaluation.blimp}")
-    # print(f"CoLA: {evaluation.cola}")
-    
+
     return evaluation
 
   # Define what to run here

@@ -55,10 +55,11 @@ def concat(examples):
     examples["attention_mask"]=[list(chain.from_iterable(examples['attention_mask']))] # convert chain to list of tokens
     return examples
 
-def make_paren_data(data_path, tokenizer):
+def get_paren_data(data_path, tokenizer):
     with open(data_path, 'r') as file:
         paren_data = file.read()
     
+    paren_data = paren_data[:15000]
     paren_data = paren_data.split("\n")
 
     # turn into a dataset
