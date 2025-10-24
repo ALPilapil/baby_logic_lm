@@ -79,11 +79,6 @@ def main():
   all models use the same training arguments and evaluation
   '''
   #------------------ PARAMETERS ------------------#
-  # data paths
-  paren_data_path = './pre-predata/tokenized_paren/tokenized_paren.txt'
-  nt_data_path = './data/nt_text.txt'
-  nsp_data_path = './data/nsp_text.jsonl'
-  nup_data_path = './data/nup_text.jsonl'
   # model paths
   pre_model_path = './models/pythia/pre-model'
   nt_model_path = './models/pythia/nt-model'
@@ -116,7 +111,7 @@ def main():
                                   )
 
   #------------------ train and evaluate ------------------#
-  def train_and_evaluate(task_type, data_path, max_length=256):
+  def train_and_evaluate(task_type, max_length=256):
     """
     Train and evaluate a model for different prediction tasks.
     
@@ -129,53 +124,40 @@ def main():
     """
     if task_type == 'pre_pretrain':
        # Load randomized model for next token prediction
-
         configuration = AutoConfig.from_pretrained(model_id)
         model = GPTNeoXForCausalLM(configuration) 
         model.resize_token_embeddings(len(tokenizer))
         model.apply(model._init_weights)
 
-        dataset = load_from_disk('./pre-predata/tokenized_paren')
-        train_dataset = dataset['train']
-        eval_dataset = dataset['test']
+        data_path = './pre-predata/tokenized_paren'
         save_path = pre_model_path
 
     elif task_type == 'next_token':
         model = GPTNeoXForCausalLM.from_pretrained(pre_model_path)
-        
         # Generate NT data
-        dataset = load_from_disk('./data/nt_dataset')
-        train_dataset = dataset['train']
-        eval_dataset = dataset['test']
+        data_path = './data/nt_dataset'
         save_path = nt_model_path
         
     elif task_type == 'next_sentence':
         # Load pre-trained NT model for next sentence prediction
         model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
-        
-        # Generate NSP data
-        dataset = load_from_disk('./data/nsp_dataset')
-        train_dataset = dataset['train']
-        eval_dataset = dataset['test']
+        data_path = './data/nsp_dataset'
         save_path = nsp_model_path
         
     elif task_type == 'next_utterance':
         # Load pre-trained NT model for next utterance prediction
         model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
-        
-        # Generate NUP data (using same function as NSP)
-        dataset = load_from_disk('./data/nup_dataset')
-        train_dataset = dataset['train']
-        eval_dataset = dataset['test']
+        data_path = './data/nup_dataset'
         save_path = nup_model_path
         
     else:
         raise ValueError("task_type must be 'next_token', 'next_sentence', or 'next_utterance'")
-    
-    # do not evaluate anything for pre pre training
-    if task_type == 'pre-pre':
-       return 
-    
+  
+    # define datasets
+    dataset = load_from_disk(data_path)
+    train_dataset = dataset['train'].select(range(30))
+    eval_dataset = dataset['test'].select(range(30))
+
     # Train the model
     eval_results = train(model=model,
                         tokenizer=tokenizer,
@@ -187,6 +169,11 @@ def main():
     
     # Load trained model and evaluate
     trained_model = GPTNeoXForCausalLM.from_pretrained(save_path)
+
+    # do not evaluate anything for pre pre training
+    if task_type == 'pre-pre':
+       return 
+    
     evaluation = Evaluation(trained_model, tokenizer, eval_results)
        
     evaluation.eval()
@@ -194,14 +181,16 @@ def main():
     return evaluation
 
   # Define what to run here
-  pre_train = train_and_evaluate('pre_pretrain', paren_data_path)
-  next_token = train_and_evaluate('next_token', nt_data_path)
-  # next_sentence = train_and_evaluate('next_sentence', nsp_data_path)
-  # next_utterance = train_and_evaluate('next_utterance', nup_data_path)
+  pre_train = train_and_evaluate('pre_pretrain')
+  next_token = train_and_evaluate('next_token')
+  # next_sentence = train_and_evaluate('next_sentence')
+  # next_utterance = train_and_evaluate('next_utterance')
 
   # save the results
-  # results_path = './training_results'
-  # save_results(next_token, results_path, 'next_token')
+  results_path = './training_results'
+  save_results(next_token, results_path, 'next_token')
+  # save_results(next_sentence, results_path, 'next_sentence')
+  # save_results(next_utterance, results_path, 'next_utterance')
 
 
 if __name__ == "__main__":

@@ -11,11 +11,13 @@ We utilize pre pretraining on data containing a hierarchical format. After that 
 All the functions currently are truncated
 
 ## Instructions
-Generate dyck_sequences with python scripts/make_paren_data.py which takes an optional argument to limit the amount generated DONE
+Start with just data from childes and a dyck_sequences.txt file in pre-data/shuff_dyck
 
-Modify the tokenizer with modify_tokenizer.py DONE
+Generate dyck_sequences with python scripts/make_paren.py which takes an optional argument to limit the amount generated, will make tokenized_paren.txt
 
-Generate datasets with dataprep.py DONE
+Modify the tokenizer with modify_tokenizer.py 
+
+Generate childes training data with datasets with dataprep.py 
 
 Finally, train and evaluate the model with train.py 
 

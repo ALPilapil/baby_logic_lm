@@ -162,7 +162,7 @@ def main():
     with open('./data/childes.train', 'r') as file:
         raw_next_token_data = file.read()
 
-    raw_next_token_data = raw_next_token_data[:10000]
+    raw_next_token_data = raw_next_token_data
     clean_text = clean_data(raw_next_token_data)
     nt_text = clean_data(raw_next_token_data, remove_tag=True)
     write_text(nt_text, 'nt_text')
