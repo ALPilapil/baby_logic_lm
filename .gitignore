@@ -8,10 +8,8 @@ pre-predata/
 next_token/
 next_sentence/
 next_utterance/
-data/nsp_dataset
-data/nt_dataset
-data/nup_dataset
 tokenizers/
+data/
 
 # model stuff
 pythia/
