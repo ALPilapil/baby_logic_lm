@@ -155,8 +155,8 @@ def main():
   
     # define datasets
     dataset = load_from_disk(data_path)
-    train_dataset = dataset['train'].select(range(30))
-    eval_dataset = dataset['test'].select(range(30))
+    train_dataset = dataset['train']#.select(range(30))
+    eval_dataset = dataset['test']#.select(range(30))
 
     # Train the model
     eval_results = train(model=model,
@@ -167,13 +167,14 @@ def main():
                         save_model_path=save_path,
                         training_args=training_args)
     
-    # Load trained model and evaluate
-    trained_model = GPTNeoXForCausalLM.from_pretrained(save_path)
-
     # do not evaluate anything for pre pre training
-    if task_type == 'pre-pre':
+    if task_type == 'pre_pretrain':
        return 
     
+    # Load trained model and evaluate
+    trained_model = GPTNeoXForCausalLM.from_pretrained(save_path)
+    
+    print("running evaluation for: ", task_type)
     evaluation = Evaluation(trained_model, tokenizer, eval_results)
        
     evaluation.eval()
@@ -181,15 +182,15 @@ def main():
     return evaluation
 
   # Define what to run here
-  pre_train = train_and_evaluate('pre_pretrain')
-  next_token = train_and_evaluate('next_token')
-  # next_sentence = train_and_evaluate('next_sentence')
+  # pre_train = train_and_evaluate('pre_pretrain')
+  # next_token = train_and_evaluate('next_token')
+  next_sentence = train_and_evaluate('next_sentence')
   # next_utterance = train_and_evaluate('next_utterance')
 
   # save the results
   results_path = './training_results'
-  save_results(next_token, results_path, 'next_token')
-  # save_results(next_sentence, results_path, 'next_sentence')
+  # save_results(next_token, results_path, 'next_token')
+  save_results(next_sentence, results_path, 'next_sentence')
   # save_results(next_utterance, results_path, 'next_utterance')
 
 
