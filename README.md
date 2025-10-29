@@ -11,6 +11,8 @@ We utilize pre pretraining on data containing a hierarchical format. After that 
 All the functions currently are truncated
 
 ## Instructions
+From childes.train run format.py to generate raw datasets for next token, next sentence, and next utterance prediction. These will be turned into proper datasets later
+
 Start with just data from childes and a dyck_sequences.txt file in pre-data/shuff_dyck
 
 Generate dyck_sequences with python scripts/make_paren.py which takes an optional argument to limit the amount generated, will make tokenized_paren.txt

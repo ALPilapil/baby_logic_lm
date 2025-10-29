@@ -165,13 +165,13 @@ def main():
     raw_next_token_data = raw_next_token_data
     clean_text = clean_data(raw_next_token_data)
     nt_text = clean_data(raw_next_token_data, remove_tag=True)
-    write_text(nt_text, 'nt_text')
+    write_text(nt_text, './data/nt_text.txt')
 
     nsp_text = nsp_modify(clean_text)
-    write_pairs_jsonl(nsp_text, 'nsp_text')
+    write_pairs_jsonl(nsp_text, './data/nsp_text.jsonl')
 
     nup_text = nup_modify(clean_text)
-    write_pairs_jsonl(nup_text, 'nup_text')
+    write_pairs_jsonl(nup_text, './data/nup_text.jsonl')
 
 if __name__ == "__main__":
     main()
