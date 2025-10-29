@@ -1,13 +1,14 @@
 import csv
 import os
 #from hf
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer 
 from transformers import DataCollatorForLanguageModeling
 from transformers import TrainingArguments, Trainer
 from transformers import GPTNeoXForCausalLM, AutoConfig
 from datasets import load_from_disk
 # custom scripts
 from eval import Evaluation
+from collator import CustomDataCollator
 
 # General function to use for all 3 models
 def train(model,
@@ -86,9 +87,11 @@ def main():
   nup_model_path = './models/pythia/nup-model'
   model_id = "EleutherAI/pythia-70m"
   tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
+  tokenizer.pad_token = tokenizer.eos_token
   output_dir = 'pythia/standard-pythia'
 
-  data_collator = DataCollatorForLanguageModeling(tokenizer,mlm=False)
+  data_collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
+  custom_data_collator = CustomDataCollator(tokenizer)
 
   # training arguments
   training_args = TrainingArguments(output_dir=output_dir,
@@ -111,7 +114,7 @@ def main():
                                   )
 
   #------------------ train and evaluate ------------------#
-  def train_and_evaluate(task_type, max_length=256):
+  def train_and_evaluate(task_type):
     """
     Train and evaluate a model for different prediction tasks.
     
@@ -142,12 +145,14 @@ def main():
         # Load pre-trained NT model for next sentence prediction
         model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
         data_path = './data/nsp_dataset'
+        data_collator = custom_data_collator
         save_path = nsp_model_path
         
     elif task_type == 'next_utterance':
         # Load pre-trained NT model for next utterance prediction
         model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
         data_path = './data/nup_dataset'
+        data_collator = custom_data_collator
         save_path = nup_model_path
         
     else:
@@ -155,8 +160,8 @@ def main():
   
     # define datasets
     dataset = load_from_disk(data_path)
-    train_dataset = dataset['train']#.select(range(30))
-    eval_dataset = dataset['test']#.select(range(30))
+    train_dataset = dataset['train'].select(range(10))
+    eval_dataset = dataset['test'].select(range(10))
 
     # Train the model
     eval_results = train(model=model,
@@ -184,15 +189,15 @@ def main():
   # Define what to run here
   # pre_train = train_and_evaluate('pre_pretrain')
   # next_token = train_and_evaluate('next_token')
-  next_sentence = train_and_evaluate('next_sentence')
-  # next_utterance = train_and_evaluate('next_utterance')
+  # next_sentence = train_and_evaluate('next_sentence')
+  next_utterance = train_and_evaluate('next_utterance')
 
   # save the results
-  results_path = './training_results'
+  # results_path = './training_results'
   # save_results(next_token, results_path, 'next_token')
-  save_results(next_sentence, results_path, 'next_sentence')
+  # save_results(next_sentence, results_path, 'next_sentence')
   # save_results(next_utterance, results_path, 'next_utterance')
 
-
+  # NOTE: the next sentence and next utterance datasets are still truncated
 if __name__ == "__main__":
   main()
