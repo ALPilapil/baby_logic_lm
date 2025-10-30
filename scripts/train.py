@@ -160,8 +160,8 @@ def main():
   
     # define datasets
     dataset = load_from_disk(data_path)
-    train_dataset = dataset['train'].select(range(10))
-    eval_dataset = dataset['test'].select(range(10))
+    train_dataset = dataset['train']
+    eval_dataset = dataset['test']
 
     # Train the model
     eval_results = train(model=model,
@@ -189,15 +189,14 @@ def main():
   # Define what to run here
   # pre_train = train_and_evaluate('pre_pretrain')
   # next_token = train_and_evaluate('next_token')
-  # next_sentence = train_and_evaluate('next_sentence')
+  next_sentence = train_and_evaluate('next_sentence')
   next_utterance = train_and_evaluate('next_utterance')
 
   # save the results
-  # results_path = './training_results'
+  results_path = './training_results'
   # save_results(next_token, results_path, 'next_token')
-  # save_results(next_sentence, results_path, 'next_sentence')
-  # save_results(next_utterance, results_path, 'next_utterance')
+  save_results(next_sentence, results_path, 'next_sentence')
+  save_results(next_utterance, results_path, 'next_utterance')
 
-  # NOTE: the next sentence and next utterance datasets are still truncated
 if __name__ == "__main__":
   main()

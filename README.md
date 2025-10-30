@@ -8,7 +8,8 @@ We utilize pre pretraining on data containing a hierarchical format. After that 
 
 
 ## Self note
-All the functions currently are truncated
+Evaluation suites currently truncated.
+Training models takes hours for both prepre training and childes training.
 
 ## Instructions
 From childes.train run format.py to generate raw datasets for next token, next sentence, and next utterance prediction. These will be turned into proper datasets later
