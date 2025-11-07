@@ -134,7 +134,7 @@ class Evaluation():
     so the model scores type1 as 4th n times, type2 as 1st x times etc.
     '''
     # read in the data
-    test_set = read_syntax_data(file_path)[:36]
+    test_set = read_syntax_data(file_path)
 
      # make batches of every 12 lines
     candidates = []
@@ -192,7 +192,7 @@ class Evaluation():
     results = {}
 
     # a list of file paths
-    test_files_paths = list(folder.glob("*.jsonl"))[:1]
+    test_files_paths = list(folder.glob("*.jsonl"))
 
     for file_path in test_files_paths:
       testcase = file_path.stem

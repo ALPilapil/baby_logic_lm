@@ -85,7 +85,7 @@ def main():
   nt_model_path = './models/pythia/nt-model'
   nsp_model_path = './models/pythia/nsp-model'
   nup_model_path = './models/pythia/nup-model'
-  model_id = "EleutherAI/pythia-70m"
+  model_id = "EleutherAI/pythia-160m"
   tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
   tokenizer.pad_token = tokenizer.eos_token
   output_dir = 'pythia/standard-pythia'
@@ -193,7 +193,7 @@ def main():
   next_utterance = train_and_evaluate('next_utterance')
 
   # save the results
-  results_path = './training_results'
+  results_path = './training_results.csv'
   # save_results(next_token, results_path, 'next_token')
   save_results(next_sentence, results_path, 'next_sentence')
   save_results(next_utterance, results_path, 'next_utterance')
