@@ -1,5 +1,7 @@
 import csv
 import os
+import torch
+import gc
 #from hf
 from transformers import AutoTokenizer 
 from transformers import DataCollatorForLanguageModeling
@@ -54,7 +56,6 @@ def save_results(evaluation, filename, task):
         'perplexity': evaluation.perplexity,
         'CN': evaluation.CN,
         'BLiMP': evaluation.blimp,
-        'CoLA': evaluation.cola
     }
     
    # Check if file exists to determine if we need headers
@@ -76,41 +77,88 @@ def save_results(evaluation, filename, task):
 
 
 class Model():
-  def __init__(self, task_type, model_load_path, data_path, tokenizer, model_save_path, data_collator, fresh_model=False):
+  def __init__(self, task_type, model_load_path, data_path, tokenizer, model_save_path, data_collator):
     '''
     set all the model parameters  
     '''
     self.task_type = task_type # string of the model type
     self.tokenizer = tokenizer 
 
-    if fresh_model: # initialize a fresh model
+    if model_load_path is None: # initialize a fresh model
+       model_id = "EleutherAI/pythia-160m"
        configuration = AutoConfig.from_pretrained(model_id)
        model = GPTNeoXForCausalLM(configuration) 
        model.resize_token_embeddings(len(tokenizer))
        model.apply(model._init_weights)
        self.model = model
     else:
-       self.model = GPTNeoXForCausalLM.from_pretrained(model_load_path)
-        
+       model = GPTNeoXForCausalLM.from_pretrained(model_load_path)
+       model.resize_token_embeddings(len(tokenizer))
+       self.model = model
+    
+    self.data_collator = data_collator
+    self.data_path = data_path
+    self.model_save_path = model_save_path
 
-
-
-
-
-  def train():
+  def train(self):
     '''
     train the model and save the direct results
     '''
+    dataset = load_from_disk(self.data_path)
+    train_dataset = dataset['train'].select(range(200))
+    eval_dataset = dataset['test'].select(range(60))
+    output_dir = 'pythia/standard-pythia'
+
+    # training arguments
+    training_args = TrainingArguments(output_dir=output_dir,
+                                      eval_strategy="steps",
+                                      eval_steps=500,
+                                      num_train_epochs=1,
+                                      per_device_train_batch_size=8,
+                                      per_device_eval_batch_size=8,
+                                      learning_rate=2.5e-4,
+                                      lr_scheduler_type='cosine',
+                                      warmup_ratio=0.05,
+                                      adam_beta1=0.9,
+                                      adam_beta2=0.999,
+                                      weight_decay=0.01,
+                                      logging_strategy="steps",
+                                      logging_steps = 500,
+                                      save_steps=5000,
+                                      save_total_limit=10,
+                                      report_to='wandb',
+                                    )
+    # run it
+    eval_results = train(model=self.model,
+                        tokenizer=self.tokenizer,
+                        train_dataset=train_dataset,
+                        eval_dataset=eval_dataset,
+                        data_collator=self.data_collator,
+                        save_model_path=self.model_save_path,
+                        training_args=training_args)
     
-  def evaluate():
+    self.training_results = eval_results
+
+    
+  def evaluate(self):
     '''
     run the evaluation on the model saved here
     ''' 
+    # load trained model and evaluate
+    trained_model = GPTNeoXForCausalLM.from_pretrained(self.model_save_path)
+    
+    print("running evaluation for: ", self.task_type)
+    evaluation = Evaluation(trained_model, self.tokenizer, self.training_results)
+       
+    evaluation.eval()
 
-  def save_results():
+    self.evaluation_results = evaluation
+
+  def save_eval(self, filename):
     '''
     save it to the csv
     '''
+    save_results(self.evaluation_results, filename, self.task_type)
 
   def cleanup(self):
     '''
@@ -122,135 +170,49 @@ class Model():
         torch.cuda.empty_cache()
     gc.collect()
 
-
-
 def main():
   '''
   has parameters for where to save the 3 models, train them, and evaluate them
   all models use the same training arguments and evaluation
   '''
   #------------------ PARAMETERS ------------------#
-  # model paths
+  ## model paths, double as loading and saving to
   pre_model_path = './models/pythia/pre-model'
   nt_model_path = './models/pythia/nt-model'
   nsp_model_path = './models/pythia/nsp-model'
   nup_model_path = './models/pythia/nup-model'
-  model_id = "EleutherAI/pythia-160m"
-  tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
-  tokenizer.pad_token = tokenizer.eos_token
-  output_dir = 'pythia/standard-pythia'
+  ## tokenizers and collators
+  # for pretrianing models
+  paren_tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
+  paren_tokenizer.pad_token = paren_tokenizer.eos_token
+  paren_data_collator = DataCollatorForLanguageModeling(paren_tokenizer, mlm=False)
 
-  data_collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
-  custom_data_collator = CustomDataCollator(tokenizer)
+  # for default and posttraining models
+  default_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-160m")
+  default_tokenizer.pad_token = default_tokenizer.eos_token
+  default_data_collator = DataCollatorForLanguageModeling(default_tokenizer, mlm=False)
+  convo_data_cllator = CustomDataCollator(default_tokenizer)
 
-  # training arguments
-  training_args = TrainingArguments(output_dir=output_dir,
-                                    eval_strategy="steps",
-                                    eval_steps=500,
-                                    num_train_epochs=1,
-                                    per_device_train_batch_size=8,
-                                    per_device_eval_batch_size=8,
-                                    learning_rate=2.5e-4,
-                                    lr_scheduler_type='cosine',
-                                    warmup_ratio=0.05,
-                                    adam_beta1=0.9,
-                                    adam_beta2=0.999,
-                                    weight_decay=0.01,
-                                    logging_strategy="steps",
-                                    logging_steps = 500,
-                                    save_steps=5000,
-                                    save_total_limit=10,
-                                    report_to='wandb',
-                                  )
+  ## define what to run here
+  # next word 
+  # next_word = Model(task_type='next_word', model_load_path=None, data_path='./data/nt_dataset', tokenizer=default_tokenizer, 
+  #                   data_collator=default_data_collator, model_save_path=nt_model_path)
+  # next_word.train()
+  # next_word.evaluate()
+  # next_word.save_eval(filename='./training_results.csv')
+  # next_word.cleanup()
 
-  #------------------ train ------------------#
-  def my_train(task_type):
-    """
-    Train a model for different prediction tasks.
-    
-    Args:
-        task_type (str): 'pre-pre', 'next_token', 'next_sentence', or 'next_utterance'
-        data_path (str): Path to the training data
-        max_length (int): Maximum sequence length for NSP/NUP tasks
+  # pretrains + next word
+  pretrain_next = Model(task_type='pretrain_next', model_load_path=nt_model_path, data_path='./pre-predata/tokenized_paren', tokenizer=paren_tokenizer,
+                       data_collator=paren_data_collator, model_save_path='./models/pythia/pre_nt-model')
+  pretrain_next.train()
 
-    returns
-    """
-    if task_type == 'pre_pretrain':
-       # Load randomized model for next token prediction
-        configuration = AutoConfig.from_pretrained(model_id)
-        model = GPTNeoXForCausalLM(configuration) 
-        model.resize_token_embeddings(len(tokenizer))
-        model.apply(model._init_weights)
+  # POS + next word
 
-        data_path = './pre-predata/tokenized_paren'
-        save_path = pre_model_path
+  # next word + NUP
 
-    elif task_type == 'next_token':
-        model = GPTNeoXForCausalLM.from_pretrained(pre_model_path)
-        # Generate NT data
-        data_path = './data/nt_dataset'
-        save_path = nt_model_path
-        
-    elif task_type == 'next_sentence':
-        # Load pre-trained NT model for next sentence prediction
-        model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
-        data_path = './data/nsp_dataset'
-        data_collator = custom_data_collator
-        save_path = nsp_model_path
-        
-    elif task_type == 'next_utterance':
-        # Load pre-trained NT model for next utterance prediction
-        model = GPTNeoXForCausalLM.from_pretrained(nt_model_path)
-        data_path = './data/nup_dataset'
-        data_collator = custom_data_collator
-        save_path = nup_model_path
-        
-    else:
-        raise ValueError("task_type must be 'next_token', 'next_sentence', or 'next_utterance'")
-  
-    # define datasets
-    dataset = load_from_disk(data_path)
-    train_dataset = dataset['train']
-    eval_dataset = dataset['test']
+  # next word + NSP
 
-    # Train the model
-    eval_results = train(model=model,
-                        tokenizer=tokenizer,
-                        train_dataset=train_dataset,
-                        eval_dataset=eval_dataset,
-                        data_collator=data_collator,
-                        save_model_path=save_path,
-                        training_args=training_args)
-    
-    return eval_results
-    
-    # Load trained model and evaluate
-    trained_model = GPTNeoXForCausalLM.from_pretrained(save_path)
-    
-    print("running evaluation for: ", task_type)
-    evaluation = Evaluation(trained_model, tokenizer, eval_results)
-       
-    evaluation.eval()
-
-    return evaluation
-
-  # Define what to run here
-  # TODO: 
-  # - pretrain + next word
-  # - next word + nup
-  # - next word + nsp
-  # - pretrain + next word + nup
-  # - pretrain + next word + nsp
-  # pre_train = train_and_evaluate('pre_pretrain')
-  # next_token = train_and_evaluate('next_token')
-  next_sentence = train('next_sentence')
-  next_utterance = train('next_utterance')
-
-  # save the results
-  results_path = './training_results.csv'
-  # save_results(next_token, results_path, 'next_token')
-  save_results(next_sentence, results_path, 'next_sentence')
-  save_results(next_utterance, results_path, 'next_utterance')
 
 if __name__ == "__main__":
   main()

@@ -192,7 +192,7 @@ class Evaluation():
     results = {}
 
     # a list of file paths
-    test_files_paths = list(folder.glob("*.jsonl"))
+    test_files_paths = list(folder.glob("*.jsonl"))[:1]
 
     for file_path in test_files_paths:
       testcase = file_path.stem
@@ -261,5 +261,5 @@ class Evaluation():
     self.blimp = self.run_blimp('./evals/blimp_tests')
 
     # CoLA
-    self.cola = self.run_cola('./evals/cola_public/raw')
+    # self.cola = self.run_cola('./evals/cola_public/raw')
 
