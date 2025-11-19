@@ -62,7 +62,7 @@ def save_results(evaluation, filename, task):
     
     # Write to CSV
    with open(filename, 'a', newline='') as csvfile:
-        fieldnames = ['timestamp', 'task_type', 'CEL', 'perplexity', 'CN', 'BLiMP', 'CoLA']
+        fieldnames = ['task_type', 'CEL', 'perplexity', 'CN', 'BLiMP', 'CoLA']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         
         # Write header if file is new
@@ -73,6 +73,56 @@ def save_results(evaluation, filename, task):
         writer.writerow(results)
 
    print(f"Results saved to {filename}")
+
+
+class Model():
+  def __init__(self, task_type, model_load_path, data_path, tokenizer, model_save_path, data_collator, fresh_model=False):
+    '''
+    set all the model parameters  
+    '''
+    self.task_type = task_type # string of the model type
+    self.tokenizer = tokenizer 
+
+    if fresh_model: # initialize a fresh model
+       configuration = AutoConfig.from_pretrained(model_id)
+       model = GPTNeoXForCausalLM(configuration) 
+       model.resize_token_embeddings(len(tokenizer))
+       model.apply(model._init_weights)
+       self.model = model
+    else:
+       self.model = GPTNeoXForCausalLM.from_pretrained(model_load_path)
+        
+
+
+
+
+
+  def train():
+    '''
+    train the model and save the direct results
+    '''
+    
+  def evaluate():
+    '''
+    run the evaluation on the model saved here
+    ''' 
+
+  def save_results():
+    '''
+    save it to the csv
+    '''
+
+  def cleanup(self):
+    '''
+    clear model from memory (especially GPU)
+    '''
+    del self.model
+    del self.tokenizer
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
+
+
 
 def main():
   '''
@@ -113,17 +163,17 @@ def main():
                                     report_to='wandb',
                                   )
 
-  #------------------ train and evaluate ------------------#
-  def train_and_evaluate(task_type):
+  #------------------ train ------------------#
+  def my_train(task_type):
     """
-    Train and evaluate a model for different prediction tasks.
+    Train a model for different prediction tasks.
     
     Args:
         task_type (str): 'pre-pre', 'next_token', 'next_sentence', or 'next_utterance'
         data_path (str): Path to the training data
         max_length (int): Maximum sequence length for NSP/NUP tasks
 
-    returns the results for evaluation
+    returns
     """
     if task_type == 'pre_pretrain':
        # Load randomized model for next token prediction
@@ -172,9 +222,7 @@ def main():
                         save_model_path=save_path,
                         training_args=training_args)
     
-    # do not evaluate anything for pre pre training
-    if task_type == 'pre_pretrain':
-       return 
+    return eval_results
     
     # Load trained model and evaluate
     trained_model = GPTNeoXForCausalLM.from_pretrained(save_path)
@@ -187,10 +235,16 @@ def main():
     return evaluation
 
   # Define what to run here
+  # TODO: 
+  # - pretrain + next word
+  # - next word + nup
+  # - next word + nsp
+  # - pretrain + next word + nup
+  # - pretrain + next word + nsp
   # pre_train = train_and_evaluate('pre_pretrain')
   # next_token = train_and_evaluate('next_token')
-  next_sentence = train_and_evaluate('next_sentence')
-  next_utterance = train_and_evaluate('next_utterance')
+  next_sentence = train('next_sentence')
+  next_utterance = train('next_utterance')
 
   # save the results
   results_path = './training_results.csv'
