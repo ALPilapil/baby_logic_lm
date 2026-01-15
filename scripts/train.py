@@ -140,7 +140,7 @@ class Model():
     self.training_results = eval_results
 
     
-  def evaluate(self):
+  def evaluate(self, CN=True, blimp=True):
     '''
     run the evaluation on the model saved here
     ''' 
@@ -148,9 +148,12 @@ class Model():
     trained_model = GPTNeoXForCausalLM.from_pretrained(self.model_save_path)
     
     print("running evaluation for: ", self.task_type)
+
+    if not hasattr(self, 'training_results'):
+      self.training_results = None
     evaluation = Evaluation(trained_model, self.tokenizer, self.training_results)
-       
-    evaluation.eval()
+    
+    evaluation.eval(CN=CN, blimp=blimp)
 
     self.evaluation_results = evaluation
 
@@ -204,8 +207,8 @@ def main():
 
   # pretrains + next word
   pretrain_next = Model(task_type='pretrain_next', model_load_path=nt_model_path, data_path='./pre-predata/tokenized_paren', tokenizer=paren_tokenizer,
-                       data_collator=paren_data_collator, model_save_path='./models/pythia/pre_nt-model')
-  pretrain_next.train()
+                       data_collator=paren_data_collator, model_save_path=nt_model_path)
+  pretrain_next.evaluate(CN=False)
 
   # POS + next word
 

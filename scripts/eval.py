@@ -192,7 +192,7 @@ class Evaluation():
     results = {}
 
     # a list of file paths
-    test_files_paths = list(folder.glob("*.jsonl"))[:1]
+    test_files_paths = list(folder.glob("*.jsonl"))[:2]
 
     for file_path in test_files_paths:
       testcase = file_path.stem
@@ -245,20 +245,32 @@ class Evaluation():
     return results
 
 
-  def eval(self):
-    # perplexity
-    perplexity = math.exp(self.eval_results["eval_loss"])
-    self.perplexity = perplexity
+  def eval(self, CN, blimp):
+    if self.eval_results is None:
+      self.perplexity = None
+      self.CEL = None
 
-    # cross entropy loss
-    CEL = self.eval_results["eval_loss"]
-    self.CEL = CEL
+    else:
+      # perplexity
+      perplexity = math.exp(self.eval_results["eval_loss"])
+      self.perplexity = perplexity
+
+      # cross entropy loss
+      CEL = self.eval_results["eval_loss"]
+      self.CEL = CEL
 
     # CN
-    self.CN = self.CN_test('./evals/cn/crain-and-nakayama-breakdown.txt.data') # runs the CN test
+    if CN:
+      print("Running CN")
+      self.CN = self.CN_test('./evals/cn/crain-and-nakayama-breakdown.txt.data') # runs the CN test
 
     # BLiMP
-    self.blimp = self.run_blimp('./evals/blimp_tests')
+    if blimp:
+      print("Running BLiMP")
+      blimps = self.run_blimp('./evals/blimp_tests')
+      print()
+      self.blimp = sum(blimps.values()) / len(blimps)
+      print(self.blimp)
 
     # CoLA
     # self.cola = self.run_cola('./evals/cola_public/raw')
