@@ -238,7 +238,7 @@ def preprocess_nsp_and_save(input_file, output_dir, tokenizer, max_length=512):
 if __name__ == "__main__":
   model_id = "EleutherAI/pythia-70m"
   tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
-  # make_paren_data()
+  
   paren_read_path = './pre-predata/tokenized_paren/tokenized_paren.txt'
   paren_save_path = './pre-predata/tokenized_paren'
   compress_data(read_path=paren_read_path, save_path=paren_save_path, tokenizer=tokenizer)

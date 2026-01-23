@@ -72,11 +72,14 @@ def main(tokenizer, unique_strings, save_dir):
     input: some tokenizer, unique strings, a place to store it
     output: modified tokenizer
     '''
-    
-    
+    num = tokenizer.add_special_tokens({"additional_special_tokens": unique_strings})
+
+    # save tokenizer
+    tokenizer.save_pretrained(save_dir)
 
 
 if __name__ == "__main__":
     model_id = "EleutherAI/pythia-70m"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
-    paren_tokenizer(tokenizer)
+    
+

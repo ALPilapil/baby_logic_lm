@@ -1,6 +1,7 @@
 import nltk
 from nltk.corpus import treebank, brown
 from transformers import AutoTokenizer
+import modify_tokenizer
 # nltk.download('brown')
 
 def gen_pos_corpus(pos_corpus, overwrite=True):
@@ -12,12 +13,11 @@ def gen_pos_corpus(pos_corpus, overwrite=True):
     # initialize new string
     corpus_string = ""
     pos_corpus_list = pos_corpus.tagged_words()
+    counter = 0
 
     for pair in pos_corpus_list:
         # concatenate only the 0th element of each tuple pair and a space
         corpus_string = corpus_string + pair[1] + " "
-    
-
     
     # if overwrite:
         # overwrite the what's currently in the data
@@ -26,13 +26,6 @@ def gen_pos_corpus(pos_corpus, overwrite=True):
 
     # save this into data
 
-    print(corpus_string)
-
-def gen_tree_corpus(tree_corpus_file):
-    '''
-    same as above just with processing for treebank corpus
-    '''
-    print(treebank.parsed_sents(tree_corpus_file))
 
 def get_unq_strs(corpus_list):
     '''
@@ -60,8 +53,6 @@ def main(run_modify_tokenizer=False):
     documentation: https://www.nltk.org/data.html, https://www.nltk.org/howto/corpus.html, https://www.nltk.org/howto/corpus.html
 
     '''
-    
-
     #-------- PARAMS --------# 
     # list the available corpora that get imported manually
     pos_corpora = [brown]
@@ -71,6 +62,7 @@ def main(run_modify_tokenizer=False):
     model_id = "EleutherAI/pythia-70m"
     new_modifier_dir = "./"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tok_save_dir = './tokenizers/pos_tokenizer'
 
     #----- MODIFY TOK -----#
     if run_modify_tokenizer:
@@ -83,25 +75,15 @@ def main(run_modify_tokenizer=False):
             token_id = tokenizer.convert_tokens_to_ids(string)
             if token_id == tokenizer.unk_token_id:
                 tokens_to_add.append(string)
-        
-        
 
+        modify_tokenizer.main(tokenizer=tokenizer, unique_strings=unique_strings, save_dir=tok_save_dir)
 
-
-
-    #-------- TREES -------#
-    for file in treebank_files[:1]:
-        # each is not of the same length
-        gen_tree_corpus(file)
-        print("example tree: ")
-        print(treebank.parsed_sents(file))
-    
     #-------- POS --------#
-    print("POS tagged: ")
     # iterate through each corpus
-    # for pos_corpus in pos_corpora:
-    #     gen_pos_corpus(pos_corpus)
+    for pos_corpus in pos_corpora:
+        gen_pos_corpus(pos_corpus)
+
 
 
 if __name__ == "__main__":
-    main(run_modify_tokenizer=True)
+    main(run_modify_tokenizer=False)
