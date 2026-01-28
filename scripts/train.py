@@ -203,7 +203,7 @@ def main():
   # 4. prepre + next word
   # 5. POS + next word
 
-  
+
   # POS + next word
   ## POS
   pos = Model(task_type='pos', model_load_path=None, data_path='./data/pos_dataset', tokenizer=pos_tokenizer,

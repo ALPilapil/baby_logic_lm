@@ -258,7 +258,7 @@ def main(modify_paren_tokenizer=False):
 
 
 if __name__ == "__main__":
-    main()
+    main
 #   paren_read_path = './pre-predata/tokenized_paren/tokenized_paren.txt'
 #   paren_save_path = './pre-predata/tokenized_paren'
 #   compress_data(read_path=paren_read_path, save_path=paren_save_path, tokenizer=tokenizer)
