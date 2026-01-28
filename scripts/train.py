@@ -180,15 +180,15 @@ def main():
   '''
   #------------------ PARAMETERS ------------------#
   ## model paths, double as loading and saving to
-  pre_model_path = './models/pythia/pre-model'
+  pos_model_path = './models/pythia/pos-model'
   nt_model_path = './models/pythia/nt-model'
   nsp_model_path = './models/pythia/nsp-model'
   nup_model_path = './models/pythia/nup-model'
   ## tokenizers and collators
   # for pretrianing models
-  paren_tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
-  paren_tokenizer.pad_token = paren_tokenizer.eos_token
-  paren_data_collator = DataCollatorForLanguageModeling(paren_tokenizer, mlm=False)
+  pos_tokenizer = AutoTokenizer.from_pretrained('./tokenizers/pos_tokenizer')
+  pos_tokenizer.pad_token = pos_tokenizer.eos_token
+  pos_data_collator = DataCollatorForLanguageModeling(pos_tokenizer, mlm=False)
 
   # for default and posttraining models
   default_tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-160m")
@@ -197,20 +197,28 @@ def main():
   convo_data_cllator = CustomDataCollator(default_tokenizer)
 
   ## define what to run here
-  # next word 
-  # next_word = Model(task_type='next_word', model_load_path=None, data_path='./data/nt_dataset', tokenizer=default_tokenizer, 
-  #                   data_collator=default_data_collator, model_save_path=nt_model_path)
-  # next_word.train()
-  # next_word.evaluate()
-  # next_word.save_eval(filename='./training_results.csv')
-  # next_word.cleanup()
+  # 1. next word
+  # 2. next word + NUP
+  # 3. next word + NSP
+  # 4. prepre + next word
+  # 5. POS + next word
 
-  # pretrains + next word
-  pretrain_next = Model(task_type='pretrain_next', model_load_path=nt_model_path, data_path='./pre-predata/tokenized_paren', tokenizer=paren_tokenizer,
-                       data_collator=paren_data_collator, model_save_path=nt_model_path)
-  pretrain_next.evaluate(CN=False)
-
+  
   # POS + next word
+  ## POS
+  pos = Model(task_type='pos', model_load_path=None, data_path='./data/pos_dataset', tokenizer=pos_tokenizer,
+                       data_collator=pos_data_collator, model_save_path=pos_model_path)
+  pos.train()
+  pos.evaluate()
+  pos.save_eval(filename='./training_results.csv')
+  pos.cleanup()
+  ## next word
+  next_word = Model(task_type='next_word', model_load_path=pos_model_path, data_path='./data/nt_dataset', tokenizer=default_tokenizer, 
+                    data_collator=default_data_collator, model_save_path=nt_model_path)
+  next_word.train()
+  next_word.evaluate()
+  next_word.save_eval(filename='./training_results.csv')
+  next_word.cleanup()
 
   # next word + NUP
 

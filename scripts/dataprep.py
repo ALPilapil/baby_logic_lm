@@ -234,29 +234,35 @@ def preprocess_nsp_and_save(input_file, output_dir, tokenizer, max_length=512):
     
     return dataset_dict
 
+def main(modify_paren_tokenizer=False):
+    if modify_paren_tokenizer:
+        model_id = './tokenizers/paren_tokenizer'
+    else:
+        model_id = "EleutherAI/pythia-160m"
+
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+    nt_data = make_nt_data_chunked_scalable('./data/childes.train', './data/nt_dataset', tokenizer)
+
+    preprocess_nsp_and_save(
+        './data/nsp_text.jsonl',
+        './data/nsp_dataset',
+        tokenizer
+    )
+
+    preprocess_nsp_and_save(
+        './data/nup_text.jsonl',
+        './data/nup_dataset',
+        tokenizer
+    )
+
 
 if __name__ == "__main__":
-  model_id = "EleutherAI/pythia-70m"
-  tokenizer = AutoTokenizer.from_pretrained('./tokenizers/paren_tokenizer')
-  
-  paren_read_path = './pre-predata/tokenized_paren/tokenized_paren.txt'
-  paren_save_path = './pre-predata/tokenized_paren'
-  compress_data(read_path=paren_read_path, save_path=paren_save_path, tokenizer=tokenizer)
+    main()
+#   paren_read_path = './pre-predata/tokenized_paren/tokenized_paren.txt'
+#   paren_save_path = './pre-predata/tokenized_paren'
+#   compress_data(read_path=paren_read_path, save_path=paren_save_path, tokenizer=tokenizer)
 
-  # this also saves it
-  nt_data = make_nt_data_chunked_scalable('./data/childes.train', './data/nt_dataset', tokenizer)
-
-  preprocess_nsp_and_save(
-    './data/nsp_text.jsonl',
-    './data/nsp_dataset',
-    tokenizer
-  )
-
-  preprocess_nsp_and_save(
-    './data/nup_text.jsonl',
-    './data/nup_dataset',
-    tokenizer
-  )
 
   
   

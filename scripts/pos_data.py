@@ -5,6 +5,7 @@ import nltk
 from datasets import load_dataset
 import modify_tokenizer
 
+
 def process_text(text):
     '''
     take in a chunk of text 
@@ -66,13 +67,12 @@ def main(run_modify_tok=True):
     use this to modify the tokenizer and save it appropriately
     '''
     #-------- PARAMS --------# 
-    pos_save_dir = './data/pos_dataset'
     model_id = "EleutherAI/pythia-160m"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     tok_save_dir = './tokenizers/pos_tokenizer'
     data_save_dir = './data/pos_dataset'
-    target_num = 100
-    ratio = 0.8
+    target_num = 100_000_000
+    ratio = 0.85
     train_threshold = int(target_num * ratio)
 
     # Clear existing data files
