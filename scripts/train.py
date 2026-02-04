@@ -179,6 +179,7 @@ class Model():
         torch.cuda.empty_cache()
     gc.collect()
 
+
 def main():
   '''
   has parameters for where to save the 3 models, train them, and evaluate them
@@ -217,19 +218,44 @@ def main():
 
   # POS + next word
   ## POS
-  pos = Model(task_type='pos', model_load_path=None, data_path='./data/pos_dataset', tokenizer=pos_tokenizer,
-                       data_collator=pos_data_collator, model_save_path=pos_model_path)
-  pos.train(test_truncation=test_truncation, train_truncation=train_truncation)
-  pos.evaluate(truncation=eval_truncation)
-  pos.save_eval(filename='./training_results.csv')
-  pos.cleanup()
-  ## next word
-  next_word = Model(task_type='next_word', model_load_path=pos_model_path, data_path='./data/nt_dataset', tokenizer=default_tokenizer, 
-                    data_collator=default_data_collator, model_save_path=nt_model_path)
-  next_word.train(test_truncation=test_truncation, train_truncation=train_truncation)
-  next_word.evaluate(truncation=eval_truncation)
-  next_word.save_eval(filename='./training_results.csv')
-  next_word.cleanup()
+  task_configs = [
+    {
+        'name': 'pos',
+        'task_type': 'pos',
+        'model_load_path': None,
+        'data_path': './data/pos_dataset',
+        'tokenizer': pos_tokenizer,
+        'data_collator': pos_data_collator,
+        'model_save_path': pos_model_path
+    },
+    {
+        'name': 'next_word',
+        'task_type': 'next_word',
+        'model_load_path': pos_model_path,
+        'data_path': './data/nt_dataset',
+        'tokenizer': default_tokenizer,
+        'data_collator': default_data_collator,
+        'model_save_path': nt_model_path
+    },
+]
+  
+
+
+  # Run pipeline for each task
+  for config in task_configs:
+    print(f"Training {config['name']}...")
+    model = Model(
+          task_type=config['task_type'],
+          model_load_path=config['model_load_path'],
+          data_path=config['data_path'],
+          tokenizer=config['tokenizer'],
+          data_collator=config['data_collator'],
+          model_save_path=config['model_save_path']
+      )
+    model.train(test_truncation=test_truncation, train_truncation=train_truncation)
+    model.evaluate(truncation=eval_truncation)
+    model.save_eval(filename='./training_results.csv')
+    model.cleanup()
 
 
 if __name__ == "__main__":
