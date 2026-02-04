@@ -100,13 +100,18 @@ class Model():
     self.data_path = data_path
     self.model_save_path = model_save_path
 
-  def train(self):
+  def train(self, train_truncation=None, test_truncation=None):
     '''
     train the model and save the direct results
     '''
     dataset = load_from_disk(self.data_path)
-    train_dataset = dataset['train'].select(range(200))
-    eval_dataset = dataset['test'].select(range(60))
+    if train_truncation and test_truncation:
+      train_dataset = dataset['train'].select(range(train_truncation))
+      eval_dataset = dataset['test'].select(range(test_truncation))
+    else:
+      train_dataset = dataset['train']
+      eval_dataset = dataset['test']
+
     output_dir = 'pythia/standard-pythia'
 
     # training arguments
@@ -140,7 +145,7 @@ class Model():
     self.training_results = eval_results
 
     
-  def evaluate(self, CN=True, blimp=True):
+  def evaluate(self, truncation=None, CN=True, blimp=True):
     '''
     run the evaluation on the model saved here
     ''' 
@@ -151,7 +156,8 @@ class Model():
 
     if not hasattr(self, 'training_results'):
       self.training_results = None
-    evaluation = Evaluation(trained_model, self.tokenizer, self.training_results)
+    evaluation = Evaluation(model=trained_model, tokenizer=self.tokenizer, 
+                            eval_results=self.training_results, truncation=truncation)
     
     evaluation.eval(CN=CN, blimp=blimp)
 
@@ -196,6 +202,11 @@ def main():
   default_data_collator = DataCollatorForLanguageModeling(default_tokenizer, mlm=False)
   convo_data_cllator = CustomDataCollator(default_tokenizer)
 
+  # testing params
+  eval_truncation = 10 # how many test cases to run on trained models
+  test_truncation=100
+  train_truncation=1000
+
   ## define what to run here
   # 1. next word
   # 2. next word + NUP
@@ -208,21 +219,17 @@ def main():
   ## POS
   pos = Model(task_type='pos', model_load_path=None, data_path='./data/pos_dataset', tokenizer=pos_tokenizer,
                        data_collator=pos_data_collator, model_save_path=pos_model_path)
-  pos.train()
-  pos.evaluate()
+  pos.train(test_truncation=test_truncation, train_truncation=train_truncation)
+  pos.evaluate(truncation=eval_truncation)
   pos.save_eval(filename='./training_results.csv')
   pos.cleanup()
   ## next word
   next_word = Model(task_type='next_word', model_load_path=pos_model_path, data_path='./data/nt_dataset', tokenizer=default_tokenizer, 
                     data_collator=default_data_collator, model_save_path=nt_model_path)
-  next_word.train()
-  next_word.evaluate()
+  next_word.train(test_truncation=test_truncation, train_truncation=train_truncation)
+  next_word.evaluate(truncation=eval_truncation)
   next_word.save_eval(filename='./training_results.csv')
   next_word.cleanup()
-
-  # next word + NUP
-
-  # next word + NSP
 
 
 if __name__ == "__main__":

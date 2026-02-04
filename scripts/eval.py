@@ -113,10 +113,11 @@ def process_blimp_score(total_score):
 #----------- MAIN EVAL FUNCTION -----------#
 #------------------------------------------#
 class Evaluation():
-  def __init__(self, model, tokenizer, eval_results):
+  def __init__(self, model, tokenizer, eval_results, truncation=None):
     self.model = model
     self.tokenizer = tokenizer
     self.eval_results = eval_results
+    self.truncation = truncation
 
   def sentence_nll(self, sentence):
     inputs = self.tokenizer(sentence, return_tensors="pt")
@@ -136,7 +137,11 @@ class Evaluation():
     # read in the data
     test_set = read_syntax_data(file_path)
 
-     # make batches of every 12 lines
+    # account for truncation
+    if self.truncation:
+      test_set = test_set[:self.truncation]
+
+    # make batches of every 12 lines
     candidates = []
     scores_log = []
 
@@ -193,6 +198,10 @@ class Evaluation():
 
     # a list of file paths
     test_files_paths = list(folder.glob("*.jsonl"))[:2]
+
+    # account for truncation
+    if self.truncation:
+      test_files_paths = test_files_paths[:1]
 
     for file_path in test_files_paths:
       testcase = file_path.stem

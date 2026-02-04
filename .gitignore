@@ -16,6 +16,7 @@ pythia/
 
 # other
 tests/
+training_results.csv
 
 # python cache
 __pycache__/

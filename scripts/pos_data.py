@@ -48,7 +48,7 @@ def main(run_modify_tok=True):
     #-------- PARAMS --------# 
     tokenizer = AutoTokenizer.from_pretrained(tok_save_dir)
     data_save_dir = './data/pos_dataset'
-    target_num = 10_000
+    target_num = 100_000_000
     ratio = 0.85
     train_threshold = int(target_num * ratio)
     max_length = 512
@@ -75,7 +75,7 @@ def main(run_modify_tok=True):
     for example in dataset:
         text = example["text"]
         # convert the text into the proper pos tags
-        pos_text, count = process_text(text)
+        pos_text, _ = process_text(text)
         
         # Tokenize the POS text
         tokenized = tokenizer(
@@ -84,20 +84,20 @@ def main(run_modify_tok=True):
             max_length=max_length,
             add_special_tokens=True
         )
+
+        count = len(tokenized['input_ids'])
         
         # Determine which split to save to
         if running_count < train_threshold:
             train_data.append({
                 "input_ids": tokenized['input_ids'],
-                "attention_mask": tokenized['attention_mask'],
-                "labels": tokenized['input_ids']  # For CLM, labels = input_ids
+                "attention_mask": tokenized['attention_mask']
             })
             train_count += count
         elif running_count < target_num:
             test_data.append({
                 "input_ids": tokenized['input_ids'],
-                "attention_mask": tokenized['attention_mask'],
-                "labels": tokenized['input_ids']  # For CLM, labels = input_ids
+                "attention_mask": tokenized['attention_mask']
             })
             test_count += count
         else:
