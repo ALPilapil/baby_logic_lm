@@ -204,9 +204,9 @@ def main():
   convo_data_cllator = CustomDataCollator(default_tokenizer)
 
   # testing params
-  eval_truncation = 10 # how many test cases to run on trained models
-  test_truncation=100
-  train_truncation=1000
+  eval_truncation=None # how much CN to run, will also auto set BLiMP to one suite
+  test_truncation=None
+  train_truncation=None
 
   ## define what to run here
   # 1. next word
@@ -220,18 +220,9 @@ def main():
   ## POS
   task_configs = [
     {
-        'name': 'pos',
-        'task_type': 'pos',
-        'model_load_path': None,
-        'data_path': './data/pos_dataset',
-        'tokenizer': pos_tokenizer,
-        'data_collator': pos_data_collator,
-        'model_save_path': pos_model_path
-    },
-    {
         'name': 'next_word',
         'task_type': 'next_word',
-        'model_load_path': pos_model_path,
+        'model_load_path': None,
         'data_path': './data/nt_dataset',
         'tokenizer': default_tokenizer,
         'data_collator': default_data_collator,

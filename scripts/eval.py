@@ -104,7 +104,7 @@ def process_blimp_score(total_score):
   tally = 0
 
   for pair in total_score:
-    if pair[0] > pair[1]:
+    if pair[0] < pair[1]:
       tally += 1
 
   return tally/total_amount
@@ -197,7 +197,7 @@ class Evaluation():
     results = {}
 
     # a list of file paths
-    test_files_paths = list(folder.glob("*.jsonl"))[:2]
+    test_files_paths = list(folder.glob("*.jsonl"))
 
     # account for truncation
     if self.truncation:
@@ -234,26 +234,6 @@ class Evaluation():
 
     return {"bad": bad_results, "good": good_results}
 
-
-  def run_cola(self, path):
-    '''
-    similar to blimp, folders for every test
-    '''
-    folder = Path(path)
-    results = {}
-
-    # a list of file paths
-    test_files_paths = list(folder.glob("*.tsv"))[:1]
-
-    for file_path in test_files_paths:
-      testcase = file_path.stem
-      # test case name without the jsonl ending
-      result = self.run_cola_test(file_path)
-      results[testcase] = result
-
-    return results
-
-
   def eval(self, CN, blimp):
     if self.eval_results is None:
       self.perplexity = None
@@ -280,7 +260,4 @@ class Evaluation():
       print()
       self.blimp = sum(blimps.values()) / len(blimps)
       print(self.blimp)
-
-    # CoLA
-    # self.cola = self.run_cola('./evals/cola_public/raw')
 
