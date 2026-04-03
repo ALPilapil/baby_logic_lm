@@ -14,6 +14,7 @@ Usage
 
 import re
 import sys
+import os
 
 from transformers import AutoTokenizer
 
@@ -31,6 +32,7 @@ def convert_paren_file(input_path: str, output_path: str, limit: int | None = No
     Processes the file in chunks to stay memory-efficient.
     """
     lines_done = 0
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with open(input_path, "r") as infile, open(output_path, "w") as outfile:
         buffer = []
