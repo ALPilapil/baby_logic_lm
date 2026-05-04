@@ -26,6 +26,7 @@ from config import (
     BASE_MODEL_ID,
     BLIMP_DIR,
     CN_DATA_PATH,
+    PRETRAIN_CONFIGS,
     RESULTS_CSV,
     TASK_CONFIGS,
     TaskConfig,
@@ -175,16 +176,15 @@ def main():
     train_cfg = TrainingConfig()
 
     # ── Pick which tasks to run ──────────────────────────────────────────────
-    # Add or remove names from TASK_CONFIGS (defined in config.py).
-    # Two-stage pipelines: list them in order — each loads the previous save.
+    # For two-stage pre-training conditions, run the PRETRAIN_CONFIGS stage
+    # first (once) to produce the checkpoint, then run the TASK_CONFIGS stage.
     tasks_to_run = [
         TASK_CONFIGS["next_word"],
-        # TASK_CONFIGS["pos_pretrain"],
+        # PRETRAIN_CONFIGS["pos_pretrain"],   # run once to produce checkpoint
         # TASK_CONFIGS["pos_then_next_word"],
-        # TASK_CONFIGS["paren_pretrain"],
+        # PRETRAIN_CONFIGS["paren_pretrain"], # run once to produce checkpoint
         # TASK_CONFIGS["paren_then_next_word"],
-        # TASK_CONFIGS["nup"],
-        # TASK_CONFIGS["nsp"],
+        # TASK_CONFIGS["next_word_then_nsp"],
         # TASK_CONFIGS["next_word_then_nup"],
     ]
     # ────────────────────────────────────────────────────────────────────────

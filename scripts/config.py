@@ -71,16 +71,10 @@ class TaskConfig:
 
 # ── Preset task registry ──────────────────────────────────────────────────────
 
-TASK_CONFIGS: dict[str, TaskConfig] = {
+# Intermediate pre-training stages — run these first to produce checkpoints
+# consumed by pos_then_next_word and paren_then_next_word.
+PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
 
-    # 1. Vanilla next-token prediction on CHILDES
-    "next_word": TaskConfig(
-        name             = "next_word",
-        data_path        = "./data/base/nt_dataset",
-        model_save_path  = "./models/pythia/nt-model",
-    ),
-
-    # 2. POS-tag pre-training on C4
     "pos_pretrain": TaskConfig(
         name             = "pos_pretrain",
         data_path        = "./data/pos_dataset",
@@ -88,39 +82,33 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         tokenizer_path   = "./tokenizers/pos_tokenizer",
     ),
 
-    # 3. Dyck / parentheses pre-training
     "paren_pretrain": TaskConfig(
         name             = "paren_pretrain",
         data_path        = "./data/paren/nt_dataset",
         model_save_path  = "./models/pythia/paren-model",
         tokenizer_path   = "./tokenizers/paren_tokenizer",
     ),
+}
 
-    # 4. Next-sentence prediction (fine-tune from scratch)
-    "nsp": TaskConfig(
-        name                = "nsp",
-        data_path           = "./data/base/nsp_dataset",
-        model_save_path     = "./models/pythia/nsp-model",
-        use_custom_collator = True,
+# The 5 experimental conditions — each includes NTP as a training stage.
+TASK_CONFIGS: dict[str, TaskConfig] = {
+
+    # 1. NTP only (baseline)
+    "next_word": TaskConfig(
+        name             = "next_word",
+        data_path        = "./data/base/nt_dataset",
+        model_save_path  = "./models/pythia/nt-model",
     ),
 
-    # 5. Next-utterance prediction (fine-tune from scratch)
-    "nup": TaskConfig(
-        name                = "nup",
-        data_path           = "./data/base/nup_dataset",
-        model_save_path     = "./models/pythia/nup-model",
-        use_custom_collator = True,
-    ),
-
-    # 6. POS pre-train → next-word fine-tune (two-stage)
+    # 2. POS pre-train → NTP fine-tune
     "pos_then_next_word": TaskConfig(
         name             = "pos_then_next_word",
         data_path        = "./data/base/nt_dataset",
         model_save_path  = "./models/pythia/pos-nt-model",
-        model_load_path  = "./models/pythia/pos-model",  # warm-start
+        model_load_path  = "./models/pythia/pos-model",
     ),
 
-    # 7. Paren pre-train → next-word fine-tune (two-stage)
+    # 3. Paren pre-train → NTP fine-tune
     "paren_then_next_word": TaskConfig(
         name             = "paren_then_next_word",
         data_path        = "./data/base/nt_dataset",
@@ -128,7 +116,16 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path  = "./models/pythia/paren-model",
     ),
 
-    # 8. Next-word + NUP (train on NUP after next-word)
+    # 4. NTP → NSP fine-tune
+    "next_word_then_nsp": TaskConfig(
+        name                = "next_word_then_nsp",
+        data_path           = "./data/base/nsp_dataset",
+        model_save_path     = "./models/pythia/nsp-model",
+        model_load_path     = "./models/pythia/nt-model",
+        use_custom_collator = True,
+    ),
+
+    # 5. NTP → NUP fine-tune
     "next_word_then_nup": TaskConfig(
         name                = "next_word_then_nup",
         data_path           = "./data/base/nup_dataset",

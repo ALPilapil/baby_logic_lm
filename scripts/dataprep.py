@@ -35,8 +35,7 @@ def make_nt_dataset(read_path: str, save_path: str, tokenizer, block_size: int =
     print(f"Loaded {len(dataset):,} lines from {read_path}")
 
     def clean_and_tokenize(examples):
-        cleaned = [clean_data(t, remove_speaker_tags=True) for t in examples["text"]]
-        return tokenizer(cleaned, add_special_tokens=False)
+        return tokenizer(examples["text"], add_special_tokens=False)
 
     tokenized = dataset.map(
         clean_and_tokenize,

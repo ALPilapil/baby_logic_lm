@@ -124,8 +124,7 @@ class Evaluation():
     with torch.no_grad():
         outputs = self.model(**inputs, labels=inputs["input_ids"])
         # Hugging Face returns loss = average negative log-likelihood
-        nll = outputs.loss.item() * inputs["input_ids"].size(1)  # total NLL
-        # avg_nll = outputs.loss.item()                           # per-token NLL
+        nll = outputs.loss.item() * (inputs["input_ids"].size(1) - 1)  # total NLL
     return nll
 
   def CN_test(self, file_path):
@@ -149,7 +148,7 @@ class Evaluation():
       candidates.append(pair[1])
 
       # Process when we have 12 candidates OR at the end
-      if i % 12 == 0 or i == len(test_set):
+      if i % 12 == 0:
         results = map(self.sentence_nll, candidates)
         scores_log.append(list(results))
 
@@ -201,7 +200,7 @@ class Evaluation():
 
     # account for truncation
     if self.truncation:
-      test_files_paths = test_files_paths[:1]
+      test_files_paths = test_files_paths[:self.truncation]
 
     for file_path in test_files_paths:
       testcase = file_path.stem
