@@ -9,6 +9,7 @@ import csv
 import gc
 import math
 import os
+from datetime import datetime, timezone
 
 import torch
 from datasets import load_from_disk
@@ -127,14 +128,29 @@ def evaluate(task: TaskConfig, tokenizer, train_eval_results: dict) -> Evaluatio
     return evaluation
 
 
-def save_results(evaluation: Evaluation, task_name: str, run_num: int = 1, filename: str = RESULTS_CSV):
+def save_results(
+    evaluation: Evaluation,
+    task: TaskConfig,
+    train_cfg: TrainingConfig,
+    run_num: int,
+    train_tokens: int,
+    filename: str = RESULTS_CSV,
+):
     row = {
-        "run":        run_num,
-        "task_type":  task_name,
-        "CEL":        evaluation.CEL,
-        "perplexity": evaluation.perplexity,
-        "CN":         evaluation.CN,
-        "BLiMP":      evaluation.blimp,
+        "timestamp":    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "run":          run_num,
+        "task_type":    task.name,
+        "base_model":   BASE_MODEL_ID,
+        "warmup_from":  task.model_load_path or "random_init",
+        "epochs":       task.num_train_epochs,
+        "train_tokens": train_tokens,
+        "total_tokens": train_tokens * task.num_train_epochs,
+        "learning_rate": train_cfg.learning_rate,
+        "batch_size":   train_cfg.per_device_train_batch_size,
+        "CEL":          evaluation.CEL,
+        "perplexity":   evaluation.perplexity,
+        "CN":           evaluation.CN,
+        "BLiMP":        evaluation.blimp,
     }
     file_exists = os.path.exists(filename)
     with open(filename, "a", newline="") as f:
@@ -163,11 +179,13 @@ def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1):
     eval_ds  = (dataset["test"].select(range(task.test_truncation))
                 if task.test_truncation else dataset["test"])
 
+    train_tokens = sum(len(ids) for ids in train_ds["input_ids"])
+
     train_eval_results = train(model, tokenizer, train_ds, eval_ds,
                                collator, task, train_cfg, seed=run_num)
 
     evaluation = evaluate(task, tokenizer, train_eval_results)
-    save_results(evaluation, task.name, run_num)
+    save_results(evaluation, task, train_cfg, run_num, train_tokens)
 
     # Free GPU memory before the next task
     del model, tokenizer
