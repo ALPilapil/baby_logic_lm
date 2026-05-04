@@ -126,7 +126,7 @@ Outputs (paren tokenizer):
 ### Step 5 — Train
 
 ```bash
-python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>]
+python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>] [--runs <n>]
 ```
 
 | Argument | Description |
@@ -134,6 +134,7 @@ python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>]
 | `--tasks` | Ordered list of task keys to run (see conditions table above) |
 | `--epochs` | `num_train_epochs` applied to every task in the run |
 | `--pretrain-tokens` | Token budget for pre-training stages; auto-computes `train_truncation` |
+| `--runs` | Number of times to repeat the full task sequence (default: `1`). Each run uses its index as the random seed, so results are statistically independent. |
 
 Each task trains the model, evaluates it (CN + BLiMP), and appends a row to `training_results.csv`. Tasks run sequentially; GPU memory is freed between them.
 
@@ -207,8 +208,19 @@ All evaluation results are appended to `training_results.csv`:
 
 | Column | Description |
 |--------|-------------|
+| `timestamp` | UTC datetime the run completed (ISO 8601) |
+| `run` | Run index (1, 2, …); also used as the random seed |
 | `task_type` | Task name |
+| `base_model` | Base model architecture ID |
+| `warmup_from` | Checkpoint the model was initialized from (`random_init` if trained from scratch) |
+| `epochs` | Number of training epochs |
+| `train_tokens` | Tokens in the training set for one epoch |
+| `total_tokens` | Total tokens seen (`train_tokens × epochs`) |
+| `learning_rate` | Peak learning rate |
+| `batch_size` | Per-device training batch size |
 | `CEL` | Cross-entropy loss |
 | `perplexity` | Exp of eval loss |
 | `CN` | Crain & Nakayama syntactic evaluation |
 | `BLiMP` | Average BLiMP suite accuracy |
+
+> **Note:** If you have a `training_results.csv` from before these columns were added, delete or rename it before running — new rows use a different header and will not align with old ones.
