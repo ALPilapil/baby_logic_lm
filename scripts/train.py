@@ -19,6 +19,7 @@ from transformers import (
     GPTNeoXForCausalLM,
     Trainer,
     TrainingArguments,
+    set_seed,
 )
 
 from collator import CustomDataCollator
@@ -73,6 +74,7 @@ def train(
     collator,
     task: TaskConfig,
     cfg: TrainingConfig,
+    seed: int = 1,
 ) -> dict:
     args = TrainingArguments(
         output_dir                   = task.model_save_path,
@@ -92,6 +94,7 @@ def train(
         save_steps                   = cfg.save_steps,
         save_total_limit             = cfg.save_total_limit,
         report_to                    = cfg.report_to,
+        seed                         = seed,
     )
 
     trainer = Trainer(
@@ -124,8 +127,9 @@ def evaluate(task: TaskConfig, tokenizer, train_eval_results: dict) -> Evaluatio
     return evaluation
 
 
-def save_results(evaluation: Evaluation, task_name: str, filename: str = RESULTS_CSV):
+def save_results(evaluation: Evaluation, task_name: str, run_num: int = 1, filename: str = RESULTS_CSV):
     row = {
+        "run":        run_num,
         "task_type":  task_name,
         "CEL":        evaluation.CEL,
         "perplexity": evaluation.perplexity,
@@ -143,10 +147,12 @@ def save_results(evaluation: Evaluation, task_name: str, filename: str = RESULTS
 
 # ── Top-level pipeline ────────────────────────────────────────────────────────
 
-def run_task(task: TaskConfig, train_cfg: TrainingConfig):
+def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1):
     print(f"\n{'='*55}")
-    print(f"  Task: {task.name}")
+    print(f"  Task: {task.name}  [run {run_num}]")
     print(f"{'='*55}")
+
+    set_seed(run_num)
 
     tokenizer, collator = build_tokenizer_and_collator(task)
     model = build_model(task, tokenizer)
@@ -158,10 +164,10 @@ def run_task(task: TaskConfig, train_cfg: TrainingConfig):
                 if task.test_truncation else dataset["test"])
 
     train_eval_results = train(model, tokenizer, train_ds, eval_ds,
-                               collator, task, train_cfg)
+                               collator, task, train_cfg, seed=run_num)
 
     evaluation = evaluate(task, tokenizer, train_eval_results)
-    save_results(evaluation, task.name)
+    save_results(evaluation, task.name, run_num)
 
     # Free GPU memory before the next task
     del model, tokenizer
