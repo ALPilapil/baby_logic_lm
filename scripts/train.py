@@ -1,13 +1,11 @@
 """
 train.py — training pipeline.
 
-To train a different model variation, edit `tasks_to_run` in main().
-Everything else (hyperparams, paths, tokenizers) is in config.py.
+Hyperparameters and task definitions live in config.py. The entry point is main.py.
 """
 
 import csv
 import gc
-import math
 import os
 from datetime import datetime, timezone
 
@@ -134,10 +132,12 @@ def save_results(
     train_cfg: TrainingConfig,
     run_num: int,
     train_tokens: int,
+    tag: str = "",
     filename: str = RESULTS_CSV,
 ):
     row = {
         "timestamp":    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "tag":          tag,
         "run":          run_num,
         "task_type":    task.name,
         "base_model":   BASE_MODEL_ID,
@@ -163,7 +163,7 @@ def save_results(
 
 # ── Top-level pipeline ────────────────────────────────────────────────────────
 
-def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1):
+def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1, tag: str = ""):
     print(f"\n{'='*55}")
     print(f"  Task: {task.name}  [run {run_num}]")
     print(f"{'='*55}")
@@ -185,7 +185,7 @@ def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1):
                                collator, task, train_cfg, seed=run_num)
 
     evaluation = evaluate(task, tokenizer, train_eval_results)
-    save_results(evaluation, task, train_cfg, run_num, train_tokens)
+    save_results(evaluation, task, train_cfg, run_num, train_tokens, tag=tag)
 
     # Free GPU memory before the next task
     del model, tokenizer
@@ -193,29 +193,3 @@ def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1):
         torch.cuda.empty_cache()
     gc.collect()
 
-
-# ── Entry point ───────────────────────────────────────────────────────────────
-
-def main():
-    train_cfg = TrainingConfig()
-
-    # ── Pick which tasks to run ──────────────────────────────────────────────
-    # For two-stage pre-training conditions, run the PRETRAIN_CONFIGS stage
-    # first (once) to produce the checkpoint, then run the TASK_CONFIGS stage.
-    tasks_to_run = [
-        TASK_CONFIGS["next_word"],
-        # PRETRAIN_CONFIGS["pos_pretrain"],   # run once to produce checkpoint
-        # TASK_CONFIGS["pos_then_next_word"],
-        # PRETRAIN_CONFIGS["paren_pretrain"], # run once to produce checkpoint
-        # TASK_CONFIGS["paren_then_next_word"],
-        # TASK_CONFIGS["next_word_then_nsp"],
-        # TASK_CONFIGS["next_word_then_nup"],
-    ]
-    # ────────────────────────────────────────────────────────────────────────
-
-    for task in tasks_to_run:
-        run_task(task, train_cfg)
-
-
-if __name__ == "__main__":
-    main()

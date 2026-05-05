@@ -1,5 +1,6 @@
 import argparse
 import copy
+import os
 import sys
 
 sys.path.insert(0, "scripts")
@@ -61,7 +62,17 @@ def main():
         metavar="N",
         help="Number of times to repeat the full task sequence (default: 1). Each run uses its index as the random seed.",
     )
+    parser.add_argument(
+        "--tag",
+        type=str,
+        default="",
+        metavar="LABEL",
+        help="Optional label written to every row of training_results.csv for grouping runs.",
+    )
     args = parser.parse_args()
+
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
 
     all_configs = {**PRETRAIN_CONFIGS, **TASK_CONFIGS}
 
@@ -69,6 +80,14 @@ def main():
         if name not in all_configs:
             raise ValueError(
                 f"Unknown task '{name}'. Valid tasks: {sorted(all_configs)}"
+            )
+
+    for name in args.tasks:
+        load_path = all_configs[name].model_load_path
+        if load_path and not os.path.exists(load_path):
+            raise FileNotFoundError(
+                f"Task '{name}' requires checkpoint '{load_path}' but it does not exist. "
+                "Run the pre-training task that produces it first."
             )
 
     train_cfg = TrainingConfig()
@@ -85,7 +104,7 @@ def main():
                     avg_len = avg_example_length(task.data_path)
                     task.train_truncation = int(args.pretrain_tokens // avg_len)
 
-            run_task(task, train_cfg, run_num)
+            run_task(task, train_cfg, run_num, args.tag)
 
 
 if __name__ == "__main__":

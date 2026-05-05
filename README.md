@@ -135,6 +135,7 @@ python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>] 
 | `--epochs` | `num_train_epochs` applied to every task in the run |
 | `--pretrain-tokens` | Token budget for pre-training stages; auto-computes `train_truncation` |
 | `--runs` | Number of times to repeat the full task sequence (default: `1`). Each run uses its index as the random seed, so results are statistically independent. |
+| `--tag` | Optional label written to every row of `training_results.csv` for grouping runs (e.g. `pilot`, `final`). |
 
 Each task trains the model, evaluates it (CN + BLiMP), and appends a row to `training_results.csv`. Tasks run sequentially; GPU memory is freed between them.
 
@@ -209,6 +210,7 @@ All evaluation results are appended to `training_results.csv`:
 | Column | Description |
 |--------|-------------|
 | `timestamp` | UTC datetime the run completed (ISO 8601) |
+| `tag` | Experiment label passed via `--tag` (empty string if omitted) |
 | `run` | Run index (1, 2, …); also used as the random seed |
 | `task_type` | Task name |
 | `base_model` | Base model architecture ID |
