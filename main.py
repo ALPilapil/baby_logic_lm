@@ -82,13 +82,15 @@ def main():
                 f"Unknown task '{name}'. Valid tasks: {sorted(all_configs)}"
             )
 
+    produced_in_run = set()
     for name in args.tasks:
         load_path = all_configs[name].model_load_path
-        if load_path and not os.path.exists(load_path):
+        if load_path and load_path not in produced_in_run and not os.path.exists(load_path):
             raise FileNotFoundError(
                 f"Task '{name}' requires checkpoint '{load_path}' but it does not exist. "
                 "Run the pre-training task that produces it first."
             )
+        produced_in_run.add(all_configs[name].model_save_path)
 
     train_cfg = TrainingConfig()
 

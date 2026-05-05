@@ -126,7 +126,7 @@ Outputs (paren tokenizer):
 ### Step 5 — Train
 
 ```bash
-python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>] [--runs <n>]
+python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>] [--runs <n>] [--tag <label>]
 ```
 
 | Argument | Description |
