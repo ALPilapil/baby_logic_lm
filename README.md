@@ -27,15 +27,29 @@ pip install -r requirements.txt
 
 ## Experimental Conditions
 
-There are 5 experimental conditions. Each includes NTP (next-token prediction on CHILDES) as a training stage. The two pre-training conditions require an intermediate checkpoint to be produced first — see [Running Experiments](#running-experiments).
+There are two experiment suites (10M and 100M tokens), each with 5 conditions. Every condition includes an NTP stage on CHILDES. Pre-training conditions require an intermediate checkpoint first — see [Running Experiments](#running-experiments).
 
-| Condition | Key | Description |
-|-----------|-----|-------------|
-| NTP only | `next_word` | Baseline — next-token prediction on CHILDES |
-| POS → NTP | `pos_then_next_word` | Pre-train on C4 POS tags, fine-tune on CHILDES |
-| Paren → NTP | `paren_then_next_word` | Pre-train on Dyck sequences, fine-tune on CHILDES |
-| NTP → NSP | `next_word_then_nsp` | Train on CHILDES, fine-tune on next-sentence prediction |
-| NTP → NUP | `next_word_then_nup` | Train on CHILDES, fine-tune on next-utterance prediction |
+### 10M suite (≈10M tokens per condition)
+
+| Condition | Tasks | Description |
+|-----------|-------|-------------|
+| Baseline NTP | `ntp_10m` | 10M tokens NTP on CHILDES |
+| NTP → NSP | `ntp_10m_for_nsp` + `nsp_10m` | 5M NTP then 5M next-sentence prediction |
+| NTP → NUP | `ntp_10m_for_nup` + `nup_10m` | 5M NTP then 5M next-utterance prediction |
+| Dyck → NTP | `dyck_pretrain` + `dyck_5m_childes` | 5M Dyck pre-train then 5M CHILDES NTP |
+| POS → NTP | `pos_pretrain` + `pos_5m_childes` | 5M POS pre-train then 5M CHILDES NTP |
+
+### 100M suite (≈79.2M tokens per condition)
+
+| Condition | Tasks | Description |
+|-----------|-------|-------------|
+| Baseline NTP | `ntp_100m` | 3 epochs × full CHILDES (79.2M tokens) |
+| NTP → NSP | `ntp_100m_for_nsp` + `nsp_100m` | 3 epochs × first half NTP + 3 epochs × second half NSP |
+| NTP → NUP | `ntp_100m_for_nup` + `nup_100m` | 3 epochs × first half NTP + 3 epochs × second half NUP |
+| Dyck → NTP | `dyck_pretrain_100m` + `dyck_100m_childes` | 39.6M Dyck pre-train + 3 epochs × first half CHILDES |
+| POS → NTP | `pos_pretrain_100m` + `pos_100m_childes` | 39.6M POS pre-train + 3 epochs × first half CHILDES |
+
+> The 10M suite also supports the original full-CHILDES conditions (`next_word`, `next_word_then_nsp`, `next_word_then_nup`, `pos_then_next_word`, `paren_then_next_word`) if you want to run without dataset splits.
 
 ---
 
@@ -44,16 +58,20 @@ There are 5 experimental conditions. Each includes NTP (next-token prediction on
 Data prep scripts run once to build datasets on disk. `main.py` then reads those datasets to train and evaluate — it does not call any data prep scripts itself.
 
 ```
-Step 1  format.py          →  data/nt_text.txt, nsp_text.jsonl, nup_text.jsonl
-Step 2  make_paren.py      →  pre-predata/tokenized_paren/, tokenizers/paren_tokenizer
-Step 3  pos_data.py        →  data/pos_dataset/, tokenizers/pos_tokenizer
-Step 4  dataprep.py        →  data/base/{nt,nsp,nup}_dataset
-        dataprep.py --paren → data/paren/nt_dataset
-Step 5  main.py            →  trained models, training_results.csv
+Step 1  format.py               →  data/nt_text.txt, nsp_text.jsonl, nup_text.jsonl
+Step 2  make_paren.py           →  pre-predata/tokenized_paren/, tokenizers/paren_tokenizer
+Step 3  pos_data.py             →  data/pos_dataset/, tokenizers/pos_tokenizer
+Step 4  dataprep.py             →  data/base/{nt,nsp,nup}_dataset
+        dataprep.py --paren     →  data/paren/nt_dataset
+Step 5  make_split_datasets.py  →  data/split/{nt_10m, nt_5m_a, nt_half_a,
+                                              nsp_5m_b, nsp_half_b,
+                                              nup_5m_b, nup_half_b}
+Step 6  main.py                 →  trained models, training_results.csv
 ```
 
 Steps 2–4 (paren) are only needed for paren experiments.
 Steps 3–4 (pos) are only needed for POS experiments.
+Step 5 is only needed for the 10M and 100M split-dataset conditions.
 
 ---
 
@@ -123,7 +141,26 @@ Outputs (paren tokenizer):
 
 ---
 
-### Step 5 — Train
+### Step 5 — Create split datasets *(skip if not doing 10M or 100M conditions)*
+
+Reads `data/nt_text.txt` and `data/childes.train` and creates token-boundary-aligned splits under `data/split/`.
+
+```bash
+python scripts/make_split_datasets.py
+```
+
+Outputs:
+- `./data/split/nt_10m` — first 10M tokens of CHILDES (NTP, 10M baseline)
+- `./data/split/nt_5m_a` — first 5M tokens (NTP stage 1 for post-training and pre-training conditions)
+- `./data/split/nt_half_a` — first ~13.2M tokens (NTP stage 1 for 100M conditions)
+- `./data/split/nsp_5m_b` — NSP pairs from tokens 5M–10M
+- `./data/split/nsp_half_b` — NSP pairs from second half of CHILDES
+- `./data/split/nup_5m_b` — NUP pairs from tokens 5M–10M
+- `./data/split/nup_half_b` — NUP pairs from second half of CHILDES
+
+---
+
+### Step 6 — Train
 
 ```bash
 python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>] [--runs <n>] [--tag <label>]
@@ -143,42 +180,66 @@ Each task trains the model, evaluates it (CN + BLiMP), and appends a row to `tra
 
 ## Running Experiments
 
-### CHILDES baseline
+The simplest way to run all experiments is `run.sh`, which covers both suites in order:
 
 ```bash
-python main.py --tasks next_word --epochs 1
+bash run.sh
 ```
 
-### Post-training conditions (NSP / NUP)
+To run individual conditions:
 
-These warm-start from the NTP checkpoint (`./models/pythia/nt-model`), so run `next_word` first.
+### 10M suite
 
 ```bash
-python main.py --tasks next_word next_word_then_nsp next_word_then_nup --epochs 1
+# 1. Baseline NTP
+python main.py --tasks ntp_10m --epochs 1 --runs 3 --tag "10m"
+
+# 2. Post-training NSP
+python main.py --tasks ntp_10m_for_nsp nsp_10m --epochs 1 --runs 3 --tag "10m"
+
+# 3. Post-training NUP
+python main.py --tasks ntp_10m_for_nup nup_10m --epochs 1 --runs 3 --tag "10m"
+
+# 4. Dyck pre-training → CHILDES NTP
+python main.py --tasks dyck_pretrain dyck_5m_childes \
+               --epochs 1 --pretrain-tokens 5000000 --runs 3 --tag "10m"
+
+# 5. POS pre-training → CHILDES NTP
+python main.py --tasks pos_pretrain pos_5m_childes \
+               --epochs 1 --pretrain-tokens 5000000 --runs 3 --tag "10m"
 ```
 
-### Pre-training conditions (POS / Paren)
+### 100M suite
 
-Pre-training tasks (`pos_pretrain`, `paren_pretrain`) must precede their fine-tuning stage in `--tasks`. Pass `--pretrain-tokens` to match the pre-training token budget to CHILDES.
+The 100M tasks use `lock_epochs=True` in config, so their epoch counts (3) are not overridden by `--epochs`. Pass `--epochs 1` only to cap the pre-training stage.
 
 ```bash
-# POS pre-training → NTP fine-tune
-python main.py --tasks pos_pretrain pos_then_next_word \
-               --epochs 1 --pretrain-tokens 5000000
+# 1. Baseline NTP (3 epochs × full CHILDES)
+python main.py --tasks ntp_100m --runs 3 --tag "100m"
 
-# Paren pre-training → NTP fine-tune
-python main.py --tasks paren_pretrain paren_then_next_word \
-               --epochs 1 --pretrain-tokens 5000000
+# 2. Post-training NSP
+python main.py --tasks ntp_100m_for_nsp nsp_100m --runs 3 --tag "100m"
+
+# 3. Post-training NUP
+python main.py --tasks ntp_100m_for_nup nup_100m --runs 3 --tag "100m"
+
+# 4. Dyck pre-training → CHILDES NTP
+python main.py --tasks dyck_pretrain_100m dyck_100m_childes \
+               --epochs 1 --pretrain-tokens 39600000 --runs 3 --tag "100m"
+
+# 5. POS pre-training → CHILDES NTP
+python main.py --tasks pos_pretrain_100m pos_100m_childes \
+               --epochs 1 --pretrain-tokens 39600000 --runs 3 --tag "100m"
 ```
 
-#### Token budget for pre-training
+### Pre-training token budget
 
-Pre-training datasets are much larger than CHILDES. Use `--pretrain-tokens` to cap them:
+`--pretrain-tokens` caps how many tokens are used from the (much larger) pre-training dataset:
 
-- **paren_pretrain** — examples are exactly 512 tokens: `train_truncation = pretrain_tokens // 512`
-- **pos_pretrain** — examples are variable length (≤ 512): `main.py` computes the average automatically
+- **paren / dyck** — examples are exactly 512 tokens: `train_truncation = pretrain_tokens // 512`
+- **pos** — examples are variable length: `main.py` computes the average automatically
 
-Set `--pretrain-tokens` to match the total token count of your CHILDES NTP training run for a fair comparison.
+Set `--pretrain-tokens` to match the CHILDES token count for a fair comparison (5M for 10M suite, 39.6M for 100M suite).
 
 ---
 
@@ -192,14 +253,15 @@ All configuration lives in `scripts/config.py`.
 
 | Field | Description |
 |-------|-------------|
-| `num_train_epochs` | Epochs over the training set (overridden by `--epochs` in `main.py`) |
+| `num_train_epochs` | Epochs over the training set (overridden by `--epochs` unless `lock_epochs=True`) |
+| `lock_epochs` | If `True`, `--epochs` does not override `num_train_epochs` (used for 100M conditions) |
 | `train_truncation` | Cap training examples (overridden by `--pretrain-tokens` for pre-train tasks) |
 | `model_load_path` | Checkpoint to warm-start from; `None` = random init |
 | `use_custom_collator` | `True` for NSP / NUP tasks |
 
-**`PRETRAIN_CONFIGS`** — the two intermediate pre-training stages (`pos_pretrain`, `paren_pretrain`). Run these to produce checkpoints consumed by `pos_then_next_word` and `paren_then_next_word`.
+**`PRETRAIN_CONFIGS`** — intermediate pre-training stages that produce checkpoints consumed by fine-tuning tasks: `pos_pretrain`, `paren_pretrain` (10M); `dyck_pretrain_100m`, `pos_pretrain_100m` (100M).
 
-**`TASK_CONFIGS`** — the 5 experimental conditions.
+**`TASK_CONFIGS`** — all experimental conditions: the original 5 full-CHILDES conditions plus the 10M and 100M split-dataset conditions.
 
 ---
 

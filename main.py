@@ -97,7 +97,8 @@ def main():
     for run_num in range(1, args.runs + 1):
         for name in args.tasks:
             task = copy.copy(all_configs[name])
-            task.num_train_epochs = args.epochs
+            if not task.lock_epochs:
+                task.num_train_epochs = args.epochs
 
             if name in PRETRAIN_CONFIGS and args.pretrain_tokens:
                 if "paren" in name:

@@ -88,6 +88,7 @@ class TaskConfig:
     eval_truncation:     Optional[int] = None
     run_cn:              bool          = True
     run_blimp:           bool          = True
+    lock_epochs:         bool          = False  # if True, --epochs does not override num_train_epochs
 
 # ── Pre-training helpers ──────────────────────────────────────────────────────
 # Run these first (once) to produce the checkpoints loaded by
@@ -114,7 +115,28 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         model_save_path  = "./models/pythia/paren-model",
         tokenizer_path   = "./tokenizers/paren_tokenizer",
         num_train_epochs = 1,
-        train_truncation = None,   # TODO: set to <childes_tokens> // 512
+        train_truncation = None,   # set at runtime via --pretrain-tokens
+    ),
+
+    # ── 100M pre-training stages ─────────────────────────────────────────────
+    # train_truncation set at runtime via --pretrain-tokens 39600000
+
+    "dyck_pretrain_100m": TaskConfig(
+        name             = "dyck_pretrain_100m",
+        data_path        = "./data/paren/nt_dataset",
+        model_save_path  = "./models/pythia/dyck_100m_model",
+        tokenizer_path   = "./tokenizers/paren_tokenizer",
+        num_train_epochs = 1,
+        train_truncation = None,
+    ),
+
+    "pos_pretrain_100m": TaskConfig(
+        name             = "pos_pretrain_100m",
+        data_path        = "./data/pos_dataset",
+        model_save_path  = "./models/pythia/pos_100m_model",
+        tokenizer_path   = "./tokenizers/pos_tokenizer",
+        num_train_epochs = 1,
+        train_truncation = None,
     ),
 }
 
@@ -169,5 +191,147 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path     = "./models/pythia/nt-model",
         num_train_epochs    = 1,
         use_custom_collator = True,
+    ),
+
+    # ── 10M conditions (all 1 epoch, split datasets) ──────────────────────────
+    # Datasets in data/split/ created by scripts/make_split_datasets.py
+
+    # Baseline
+    "ntp_10m": TaskConfig(
+        name             = "ntp_10m",
+        data_path        = "./data/split/nt_10m",
+        model_save_path  = "./models/pythia/ntp_10m_model",
+        num_train_epochs = 1,
+    ),
+
+    # Post-training NSP: stage 1 (NTP on first 5M), stage 2 (NSP on second 5M)
+    "ntp_10m_for_nsp": TaskConfig(
+        name             = "ntp_10m_for_nsp",
+        data_path        = "./data/split/nt_5m_a",
+        model_save_path  = "./models/pythia/ntp_10m_nsp_model",
+        num_train_epochs = 1,
+    ),
+    "nsp_10m": TaskConfig(
+        name                = "nsp_10m",
+        data_path           = "./data/split/nsp_5m_b",
+        model_save_path     = "./models/pythia/nsp_10m_model",
+        model_load_path     = "./models/pythia/ntp_10m_nsp_model",
+        num_train_epochs    = 1,
+        use_custom_collator = True,
+    ),
+
+    # Post-training NUP: stage 1 (NTP on first 5M), stage 2 (NUP on second 5M)
+    "ntp_10m_for_nup": TaskConfig(
+        name             = "ntp_10m_for_nup",
+        data_path        = "./data/split/nt_5m_a",
+        model_save_path  = "./models/pythia/ntp_10m_nup_model",
+        num_train_epochs = 1,
+    ),
+    "nup_10m": TaskConfig(
+        name                = "nup_10m",
+        data_path           = "./data/split/nup_5m_b",
+        model_save_path     = "./models/pythia/nup_10m_model",
+        model_load_path     = "./models/pythia/ntp_10m_nup_model",
+        num_train_epochs    = 1,
+        use_custom_collator = True,
+    ),
+
+    # Dyck pre-training: 5M paren → random 5M CHILDES (train_truncation ≈ 9765 examples)
+    "dyck_5m_childes": TaskConfig(
+        name             = "dyck_5m_childes",
+        data_path        = "./data/base/nt_dataset",
+        model_save_path  = "./models/pythia/dyck_5m_childes_model",
+        model_load_path  = "./models/pythia/paren-model",
+        num_train_epochs = 1,
+        train_truncation = 9765,   # 9765 × 512 ≈ 5M tokens
+    ),
+
+    # POS pre-training: 5M POS → random 5M CHILDES (train_truncation ≈ 9765 examples)
+    "pos_5m_childes": TaskConfig(
+        name             = "pos_5m_childes",
+        data_path        = "./data/base/nt_dataset",
+        model_save_path  = "./models/pythia/pos_5m_childes_model",
+        model_load_path  = "./models/pythia/pos-model",
+        num_train_epochs = 1,
+        train_truncation = 9765,   # 9765 × 512 ≈ 5M tokens
+    ),
+
+    # ── 100M conditions (lock_epochs=True; epochs set in config, not --epochs) ─
+    # Hard cap: ≤100M tokens per condition.
+    # train_truncation sets examples/epoch so that epochs × truncation × 512 = target.
+    #   baseline:      4 × 48828 × 512 = 99,999,744  (~100M)
+    #   post-training: (4 × 24414 × 512) × 2 stages  = 99,997,696  (~100M)
+    #   pre-training:  50M pre-train + 2 × 48828 × 512 = 49,999,872  (~50M CHILDES)
+
+    # Baseline: 4 epochs, truncated to 48828 examples → 99,999,744 tokens
+    "ntp_100m": TaskConfig(
+        name             = "ntp_100m",
+        data_path        = "./data/base/nt_dataset",
+        model_save_path  = "./models/pythia/ntp_100m_model",
+        num_train_epochs = 4,
+        train_truncation = 48828,
+        lock_epochs      = True,
+    ),
+
+    # Post-training NSP: 4 epochs × 24414 examples each stage → 50M + 50M = ~100M
+    "ntp_100m_for_nsp": TaskConfig(
+        name             = "ntp_100m_for_nsp",
+        data_path        = "./data/split/nt_half_a",
+        model_save_path  = "./models/pythia/ntp_100m_nsp_model",
+        num_train_epochs = 4,
+        train_truncation = 24414,
+        lock_epochs      = True,
+    ),
+    "nsp_100m": TaskConfig(
+        name                = "nsp_100m",
+        data_path           = "./data/split/nsp_half_b",
+        model_save_path     = "./models/pythia/nsp_100m_model",
+        model_load_path     = "./models/pythia/ntp_100m_nsp_model",
+        num_train_epochs    = 4,
+        train_truncation    = 24414,
+        use_custom_collator = True,
+        lock_epochs         = True,
+    ),
+
+    # Post-training NUP: 4 epochs × 24414 examples each stage → 50M + 50M = ~100M
+    "ntp_100m_for_nup": TaskConfig(
+        name             = "ntp_100m_for_nup",
+        data_path        = "./data/split/nt_half_a",
+        model_save_path  = "./models/pythia/ntp_100m_nup_model",
+        num_train_epochs = 4,
+        train_truncation = 24414,
+        lock_epochs      = True,
+    ),
+    "nup_100m": TaskConfig(
+        name                = "nup_100m",
+        data_path           = "./data/split/nup_half_b",
+        model_save_path     = "./models/pythia/nup_100m_model",
+        model_load_path     = "./models/pythia/ntp_100m_nup_model",
+        num_train_epochs    = 4,
+        train_truncation    = 24414,
+        use_custom_collator = True,
+        lock_epochs         = True,
+    ),
+
+    # Dyck 100M: 50M paren → 2 epochs × 48828 examples CHILDES → 49,999,872 tokens (~50M)
+    "dyck_100m_childes": TaskConfig(
+        name             = "dyck_100m_childes",
+        data_path        = "./data/base/nt_dataset",
+        model_save_path  = "./models/pythia/dyck_100m_childes_model",
+        model_load_path  = "./models/pythia/dyck_100m_model",
+        num_train_epochs = 2,
+        train_truncation = 48828,
+        lock_epochs      = True,
+    ),
+
+    # POS 100M: 50M POS → 2 epochs × 48828 examples CHILDES → 49,999,872 tokens (~50M)
+    "pos_100m_childes": TaskConfig(
+        name             = "pos_100m_childes",
+        data_path        = "./data/base/nt_dataset",
+        model_save_path  = "./models/pythia/pos_100m_childes_model",
+        model_load_path  = "./models/pythia/pos_100m_model",
+        num_train_epochs = 2,
+        train_truncation = 48828,
+        lock_epochs      = True,
     ),
 }

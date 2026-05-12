@@ -3,31 +3,86 @@ set -e
 
 # ── Experiment parameters ─────────────────────────────────────────────────────
 RUNS=3
-EPOCHS=1
-PRETRAIN_TOKENS=10000000   # 10M — token-matched to CHILDES for fair comparison
-TAG="initial runs"
+TAG_10M="10m"
+TAG_100M="100m"
 # ─────────────────────────────────────────────────────────────────────────────
 
-# 1. Baseline NTP + post-training conditions
-#    next_word must precede next_word_then_nsp/nup — they warm-start from its checkpoint.
+# ── Data prep (run once before training) ─────────────────────────────────────
+# python scripts/make_split_datasets.py
+
+# ══ 10M suite (≈10M tokens per condition) ════════════════════════════════════
+
+# 1. Baseline NTP — 10M tokens, 1 epoch
 python main.py \
-    --tasks next_word next_word_then_nsp next_word_then_nup \
-    --epochs "$EPOCHS" \
+    --tasks ntp_10m \
+    --epochs 1 \
     --runs "$RUNS" \
-    --tag "$TAG"
+    --tag "$TAG_10M"
 
-# 2. POS pre-training → NTP fine-tune
-# python main.py \
-#     --tasks pos_pretrain pos_then_next_word \
-#     --epochs "$EPOCHS" \
-#     --pretrain-tokens "$PRETRAIN_TOKENS" \
-#     --runs "$RUNS" \
-#     --tag "$TAG"
+# 2. Post-training NSP — 5M NTP (stage 1) + 5M NSP (stage 2)
+python main.py \
+    --tasks ntp_10m_for_nsp nsp_10m \
+    --epochs 1 \
+    --runs "$RUNS" \
+    --tag "$TAG_10M"
 
-# # 3. Paren pre-training → NTP fine-tune
-# python main.py \
-#     --tasks paren_pretrain paren_then_next_word \
-#     --epochs "$EPOCHS" \
-#     --pretrain-tokens "$PRETRAIN_TOKENS" \
-#     --runs "$RUNS" \
-#     --tag "$TAG"
+# 3. Post-training NUP — 5M NTP (stage 1) + 5M NUP (stage 2)
+python main.py \
+    --tasks ntp_10m_for_nup nup_10m \
+    --epochs 1 \
+    --runs "$RUNS" \
+    --tag "$TAG_10M"
+
+# 4. Dyck pre-training — 5M paren (pre-train) + random 5M CHILDES NTP (fine-tune)
+python main.py \
+    --tasks dyck_pretrain dyck_5m_childes \
+    --epochs 1 \
+    --pretrain-tokens 5000000 \
+    --runs "$RUNS" \
+    --tag "$TAG_10M"
+
+# 5. POS pre-training — 5M POS (pre-train) + random 5M CHILDES NTP (fine-tune)
+python main.py \
+    --tasks pos_pretrain pos_5m_childes \
+    --epochs 1 \
+    --pretrain-tokens 5000000 \
+    --runs "$RUNS" \
+    --tag "$TAG_10M"
+
+# ══ 100M suite (≈100–106M tokens per condition) ═══════════════════════════════
+# lock_epochs=True in config controls epoch counts for 100M tasks;
+# --epochs 1 applies only to pre-training stages.
+
+# 1. Baseline NTP — 4 epochs × full CHILDES (≈105.6M tokens)
+python main.py \
+    --tasks ntp_100m \
+    --runs "$RUNS" \
+    --tag "$TAG_100M"
+
+# 2. Post-training NSP — 4 epochs × first half NTP (≈52.8M) + 4 epochs × second half NSP (≈52.8M)
+python main.py \
+    --tasks ntp_100m_for_nsp nsp_100m \
+    --runs "$RUNS" \
+    --tag "$TAG_100M"
+
+# 3. Post-training NUP — 4 epochs × first half NTP (≈52.8M) + 4 epochs × second half NUP (≈52.8M)
+python main.py \
+    --tasks ntp_100m_for_nup nup_100m \
+    --runs "$RUNS" \
+    --tag "$TAG_100M"
+
+# 4. Dyck pre-training — 50M paren (pre-train) + 2 epochs × full CHILDES (≈52.8M)
+python main.py \
+    --tasks dyck_pretrain_100m dyck_100m_childes \
+    --epochs 1 \
+    --pretrain-tokens 50000000 \
+    --runs "$RUNS" \
+    --tag "$TAG_100M"
+
+# 5. POS pre-training — 50M POS (pre-train) + 2 epochs × full CHILDES (≈52.8M)
+python main.py \
+    --tasks pos_pretrain_100m pos_100m_childes \
+    --epochs 1 \
+    --pretrain-tokens 50000000 \
+    --runs "$RUNS" \
+    --tag "$TAG_100M"
