@@ -10,10 +10,12 @@ from typing import Optional
 
 # ── Shared constants ──────────────────────────────────────────────────────────
 
-BASE_MODEL_ID   = "EleutherAI/pythia-160m"
-RESULTS_CSV     = "./training_results.csv"
-CN_DATA_PATH    = "./evals/cn/crain-and-nakayama-breakdown.txt.data"
-BLIMP_DIR       = "./evals/blimp_tests"
+BASE_MODEL_ID      = "EleutherAI/pythia-160m"
+RESULTS_CSV        = "./training_results.csv"
+CN_DATA_PATH       = "./evals/cn/crain-and-nakayama-breakdown.txt.data"
+BLIMP_DIR          = "./evals/blimp_tests"
+BABYLM_EVAL_DIR    = "/home/alpilapi/projects/babylm-eval/strict"
+BABYLM_RESULTS_CSV = "./babylm_results.csv"
 
 # ── Training hyperparameters (shared across all tasks) ────────────────────────
 
@@ -89,6 +91,7 @@ class TaskConfig:
     run_cn:              bool          = True
     run_blimp:           bool          = True
     lock_epochs:         bool          = False  # if True, --epochs does not override num_train_epochs
+    run_babylm_eval:     bool          = False  # if True, runs babylm-eval zero-shot suite after this task
 
 # ── Pre-training helpers ──────────────────────────────────────────────────────
 # Run these first (once) to produce the checkpoints loaded by
@@ -153,6 +156,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         data_path        = "./data/base/nt_dataset",
         model_save_path  = "./models/pythia/nt-model",
         num_train_epochs = 1,
+        run_babylm_eval  = True,
     ),
 
     # 2. POS pre-train → NTP fine-tune
@@ -162,6 +166,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_save_path  = "./models/pythia/pos-nt-model",
         model_load_path  = "./models/pythia/pos-model",
         num_train_epochs = 1,
+        run_babylm_eval  = True,
     ),
 
     # 3. Paren pre-train → NTP fine-tune
@@ -171,6 +176,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_save_path  = "./models/pythia/paren-nt-model",
         model_load_path  = "./models/pythia/paren-model",
         num_train_epochs = 1,
+        run_babylm_eval  = True,
     ),
 
     # 4. NTP → NSP fine-tune
@@ -181,6 +187,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path     = "./models/pythia/nt-model",
         num_train_epochs    = 1,
         use_custom_collator = True,
+        run_babylm_eval     = True,
     ),
 
     # 5. NTP → NUP fine-tune
@@ -191,6 +198,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path     = "./models/pythia/nt-model",
         num_train_epochs    = 1,
         use_custom_collator = True,
+        run_babylm_eval     = True,
     ),
 
     # ── 10M conditions (all 1 epoch, split datasets) ──────────────────────────
@@ -202,6 +210,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         data_path        = "./data/split/nt_10m",
         model_save_path  = "./models/pythia/ntp_10m_model",
         num_train_epochs = 1,
+        run_babylm_eval  = True,
     ),
 
     # Post-training NSP: stage 1 (NTP on first 5M), stage 2 (NSP on second 5M)
@@ -218,6 +227,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path     = "./models/pythia/ntp_10m_nsp_model",
         num_train_epochs    = 1,
         use_custom_collator = True,
+        run_babylm_eval     = True,
     ),
 
     # Post-training NUP: stage 1 (NTP on first 5M), stage 2 (NUP on second 5M)
@@ -234,6 +244,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path     = "./models/pythia/ntp_10m_nup_model",
         num_train_epochs    = 1,
         use_custom_collator = True,
+        run_babylm_eval     = True,
     ),
 
     # Dyck pre-training: 5M paren → random 5M CHILDES (train_truncation ≈ 9765 examples)
@@ -244,6 +255,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path  = "./models/pythia/paren-model",
         num_train_epochs = 1,
         train_truncation = 9765,   # 9765 × 512 ≈ 5M tokens
+        run_babylm_eval  = True,
     ),
 
     # POS pre-training: 5M POS → random 5M CHILDES (train_truncation ≈ 9765 examples)
@@ -254,6 +266,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         model_load_path  = "./models/pythia/pos-model",
         num_train_epochs = 1,
         train_truncation = 9765,   # 9765 × 512 ≈ 5M tokens
+        run_babylm_eval  = True,
     ),
 
     # ── 100M conditions (lock_epochs=True; epochs set in config, not --epochs) ─
@@ -271,6 +284,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 4,
         train_truncation = 48828,
         lock_epochs      = True,
+        run_babylm_eval  = True,
     ),
 
     # Post-training NSP: 4 epochs × 24414 examples each stage → 50M + 50M = ~100M
@@ -291,6 +305,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         train_truncation    = 24414,
         use_custom_collator = True,
         lock_epochs         = True,
+        run_babylm_eval     = True,
     ),
 
     # Post-training NUP: 4 epochs × 24414 examples each stage → 50M + 50M = ~100M
@@ -311,6 +326,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         train_truncation    = 24414,
         use_custom_collator = True,
         lock_epochs         = True,
+        run_babylm_eval     = True,
     ),
 
     # Dyck 100M: 50M paren → 2 epochs × 48828 examples CHILDES → 49,999,872 tokens (~50M)
@@ -322,6 +338,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 2,
         train_truncation = 48828,
         lock_epochs      = True,
+        run_babylm_eval  = True,
     ),
 
     # POS 100M: 50M POS → 2 epochs × 48828 examples CHILDES → 49,999,872 tokens (~50M)
@@ -333,5 +350,6 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 2,
         train_truncation = 48828,
         lock_epochs      = True,
+        run_babylm_eval  = True,
     ),
 }
