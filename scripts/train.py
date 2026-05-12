@@ -7,8 +7,6 @@ Hyperparameters and task definitions live in config.py. The entry point is main.
 import csv
 import gc
 import os
-import subprocess
-import sys
 from datetime import datetime, timezone
 
 import torch
@@ -26,7 +24,6 @@ from transformers import (
 from collator import CustomDataCollator
 from config import (
     BASE_MODEL_ID,
-    BABYLM_RESULTS_CSV,
     BLIMP_DIR,
     CN_DATA_PATH,
     PRETRAIN_CONFIGS,
@@ -164,26 +161,6 @@ def save_results(
     print(f"  Results saved to {filename}")
 
 
-# ── BabyLM official evaluation ───────────────────────────────────────────────
-
-def run_babylm_eval(task: TaskConfig, run_num: int, tag: str = "") -> None:
-    """Calls babylm_eval.py zero-shot suite as a subprocess after training."""
-    if not task.run_babylm_eval:
-        return
-    os.makedirs("./babylm_results", exist_ok=True)
-    output_json = f"./babylm_results/{task.name}_run{run_num}.json"
-    cmd = [
-        sys.executable, "scripts/babylm_eval.py",
-        "--model_path", task.model_save_path,
-        "--task_name",  task.name,
-        "--run",        str(run_num),
-        "--skip_finetune",
-        "--output_json", output_json,
-    ]
-    print(f"  Running babylm zero-shot evals: {task.name}")
-    subprocess.run(cmd, check=False)
-
-
 # ── Top-level pipeline ────────────────────────────────────────────────────────
 
 def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1, tag: str = ""):
@@ -209,7 +186,6 @@ def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1, tag:
 
     evaluation = evaluate(task, tokenizer, train_eval_results)
     save_results(evaluation, task, train_cfg, run_num, train_tokens, tag=tag)
-    run_babylm_eval(task, run_num, tag=tag)
 
     # Free GPU memory before the next task
     del model, tokenizer
