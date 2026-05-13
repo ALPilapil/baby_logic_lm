@@ -87,7 +87,7 @@ class TaskConfig:
     test_truncation:     Optional[int] = None
     eval_truncation:     Optional[int] = None
     run_cn:              bool          = True
-    run_blimp:           bool          = True
+    run_blimp:           bool          = False
     lock_epochs:         bool          = False  # if True, --epochs does not override num_train_epochs
     token_limit:         Optional[int] = None   # if set, last CHILDES epoch is truncated to stay under this
 

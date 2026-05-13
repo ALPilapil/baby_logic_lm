@@ -234,6 +234,7 @@ class Evaluation():
     return {"bad": bad_results, "good": good_results}
 
   def eval(self, CN, blimp):
+    self.blimp = None
     if self.eval_results is None:
       self.perplexity = None
       self.CEL = None
