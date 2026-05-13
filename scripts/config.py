@@ -89,6 +89,7 @@ class TaskConfig:
     run_cn:              bool          = True
     run_blimp:           bool          = True
     lock_epochs:         bool          = False  # if True, --epochs does not override num_train_epochs
+    token_limit:         Optional[int] = None   # if set, last CHILDES epoch is truncated to stay under this
 
 # ── Pre-training helpers ──────────────────────────────────────────────────────
 # Run these first (once) to produce the checkpoints loaded by
@@ -263,7 +264,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
     #   post-training: (4 × 24414 × 512) × 2 stages  = 99,997,696  (~100M)
     #   pre-training:  50M pre-train + 2 × 48828 × 512 = 49,999,872  (~50M CHILDES)
 
-    # Baseline: 4 epochs, truncated to 48828 examples → 99,999,744 tokens
+    # Baseline: 4 epochs, truncated to 48828 examples → ≤100M tokens (last epoch truncated at runtime)
     "ntp_100m": TaskConfig(
         name             = "ntp_100m",
         data_path        = "./data/base/nt_dataset",
@@ -271,9 +272,10 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 4,
         train_truncation = 48828,
         lock_epochs      = True,
+        token_limit      = 100_000_000,
     ),
 
-    # Post-training NSP: 4 epochs × 24414 examples each stage → 50M + 50M = ~100M
+    # Post-training NSP: 4 epochs × ~24414 examples each stage → ≤50M + ≤50M = ≤100M
     "ntp_100m_for_nsp": TaskConfig(
         name             = "ntp_100m_for_nsp",
         data_path        = "./data/split/nt_half_a",
@@ -281,6 +283,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 4,
         train_truncation = 24414,
         lock_epochs      = True,
+        token_limit      = 50_000_000,
     ),
     "nsp_100m": TaskConfig(
         name                = "nsp_100m",
@@ -291,9 +294,10 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         train_truncation    = 24414,
         use_custom_collator = True,
         lock_epochs         = True,
+        token_limit         = 50_000_000,
     ),
 
-    # Post-training NUP: 4 epochs × 24414 examples each stage → 50M + 50M = ~100M
+    # Post-training NUP: 4 epochs × ~24414 examples each stage → ≤50M + ≤50M = ≤100M
     "ntp_100m_for_nup": TaskConfig(
         name             = "ntp_100m_for_nup",
         data_path        = "./data/split/nt_half_a",
@@ -301,6 +305,7 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 4,
         train_truncation = 24414,
         lock_epochs      = True,
+        token_limit      = 50_000_000,
     ),
     "nup_100m": TaskConfig(
         name                = "nup_100m",
@@ -311,9 +316,10 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         train_truncation    = 24414,
         use_custom_collator = True,
         lock_epochs         = True,
+        token_limit         = 50_000_000,
     ),
 
-    # Dyck 100M: 50M paren → 2 epochs × 48828 examples CHILDES → 49,999,872 tokens (~50M)
+    # Dyck 100M: 50M paren → 2 epochs CHILDES → ≤50M CHILDES tokens
     "dyck_100m_childes": TaskConfig(
         name             = "dyck_100m_childes",
         data_path        = "./data/base/nt_dataset",
@@ -322,9 +328,10 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 2,
         train_truncation = 48828,
         lock_epochs      = True,
+        token_limit      = 50_000_000,
     ),
 
-    # POS 100M: 50M POS → 2 epochs × 48828 examples CHILDES → 49,999,872 tokens (~50M)
+    # POS 100M: 50M POS → 2 epochs CHILDES → ≤50M CHILDES tokens
     "pos_100m_childes": TaskConfig(
         name             = "pos_100m_childes",
         data_path        = "./data/base/nt_dataset",
@@ -333,5 +340,6 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 2,
         train_truncation = 48828,
         lock_epochs      = True,
+        token_limit      = 50_000_000,
     ),
 }

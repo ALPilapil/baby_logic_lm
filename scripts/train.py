@@ -6,6 +6,7 @@ Hyperparameters and task definitions live in config.py. The entry point is main.
 
 import csv
 import gc
+import glob
 import os
 from datetime import datetime, timezone
 
@@ -63,21 +64,39 @@ def build_model(task: TaskConfig, tokenizer) -> GPTNeoXForCausalLM:
     return model
 
 
+# ── Token-limit helpers ───────────────────────────────────────────────────────
+
+def _last_epoch_truncation(task: TaskConfig, train_ds) -> int | None:
+    """Return the number of examples to use for the last epoch to stay under
+    task.token_limit. Returns None when no limit is set."""
+    if task.token_limit is None:
+        return None
+
+    tokens_per_epoch = sum(len(ids) for ids in train_ds["input_ids"])
+    full_epochs = task.num_train_epochs - 1
+    last_epoch_budget = task.token_limit - full_epochs * tokens_per_epoch
+    avg_tokens = tokens_per_epoch / len(train_ds)
+    truncation = int(last_epoch_budget // avg_tokens)
+    return max(0, min(truncation, len(train_ds)))
+
+
+def _latest_checkpoint(output_dir: str) -> str | None:
+    """Return the path of the most recent checkpoint saved under output_dir."""
+    pattern = os.path.join(output_dir, "checkpoint-*")
+    checkpoints = sorted(
+        glob.glob(pattern),
+        key=lambda p: int(p.rsplit("-", 1)[-1]),
+    )
+    return checkpoints[-1] if checkpoints else None
+
+
 # ── Training ──────────────────────────────────────────────────────────────────
 
-def train(
-    model,
-    tokenizer,
-    train_dataset,
-    eval_dataset,
-    collator,
-    task: TaskConfig,
-    cfg: TrainingConfig,
-    seed: int = 1,
-) -> dict:
-    args = TrainingArguments(
+def _make_training_args(task: TaskConfig, cfg: TrainingConfig, seed: int,
+                        num_epochs: int, report_to: str | None = None) -> TrainingArguments:
+    return TrainingArguments(
         output_dir                   = task.model_save_path,
-        num_train_epochs             = task.num_train_epochs,
+        num_train_epochs             = num_epochs,
         per_device_train_batch_size  = cfg.per_device_train_batch_size,
         per_device_eval_batch_size   = cfg.per_device_eval_batch_size,
         learning_rate                = cfg.learning_rate,
@@ -92,22 +111,72 @@ def train(
         logging_steps                = cfg.logging_steps,
         save_steps                   = cfg.save_steps,
         save_total_limit             = cfg.save_total_limit,
-        report_to                    = cfg.report_to,
+        report_to                    = report_to if report_to is not None else cfg.report_to,
         seed                         = seed,
     )
 
-    trainer = Trainer(
-        model         = model,
-        args          = args,
-        tokenizer     = tokenizer,
-        train_dataset = train_dataset,
-        eval_dataset  = eval_dataset,
-        data_collator = collator,
-    )
 
-    trainer.train()
-    trainer.save_model(task.model_save_path)
-    return trainer.evaluate()
+def train(
+    model,
+    tokenizer,
+    train_dataset,
+    eval_dataset,
+    collator,
+    task: TaskConfig,
+    cfg: TrainingConfig,
+    seed: int = 1,
+) -> dict:
+    """Train the model, optionally splitting into two phases to enforce task.token_limit."""
+    last_trunc = _last_epoch_truncation(task, train_dataset)
+    full_epochs = task.num_train_epochs - 1
+
+    if last_trunc is not None and full_epochs > 0:
+        # Phase 1: N-1 full epochs
+        phase1_args = _make_training_args(task, cfg, seed, num_epochs=full_epochs)
+        Trainer(
+            model=model, args=phase1_args, tokenizer=tokenizer,
+            train_dataset=train_dataset, eval_dataset=eval_dataset,
+            data_collator=collator,
+        ).train()
+
+        # Phase 2: 1 truncated last epoch, resuming from the latest checkpoint
+        checkpoint = _latest_checkpoint(task.model_save_path)
+        last_epoch_ds = train_dataset.select(range(last_trunc))
+        phase2_args = _make_training_args(task, cfg, seed, num_epochs=1)
+        trainer = Trainer(
+            model=model, args=phase2_args, tokenizer=tokenizer,
+            train_dataset=last_epoch_ds, eval_dataset=eval_dataset,
+            data_collator=collator,
+        )
+        trainer.train(resume_from_checkpoint=checkpoint)
+        trainer.save_model(task.model_save_path)
+        return trainer.evaluate()
+
+    elif last_trunc is not None:
+        # num_train_epochs == 1: single truncated epoch, no resume needed
+        last_epoch_ds = train_dataset.select(range(last_trunc))
+        trainer = Trainer(
+            model=model, args=_make_training_args(task, cfg, seed, num_epochs=1),
+            tokenizer=tokenizer, train_dataset=last_epoch_ds,
+            eval_dataset=eval_dataset, data_collator=collator,
+        )
+        trainer.train()
+        trainer.save_model(task.model_save_path)
+        return trainer.evaluate()
+
+    else:
+        # No token limit: original single-call path
+        trainer = Trainer(
+            model=model,
+            args=_make_training_args(task, cfg, seed, num_epochs=task.num_train_epochs),
+            tokenizer=tokenizer,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            data_collator=collator,
+        )
+        trainer.train()
+        trainer.save_model(task.model_save_path)
+        return trainer.evaluate()
 
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
@@ -161,7 +230,39 @@ def save_results(
     print(f"  Results saved to {filename}")
 
 
-# ── Top-level pipeline ────────────────────────────────────────────────────────
+# ── Shared dataset loading ─────────────────────────────────────────────────────
+
+def _load_datasets(task: TaskConfig):
+    dataset  = load_from_disk(task.data_path)
+    train_ds = (dataset["train"].select(range(task.train_truncation))
+                if task.train_truncation else dataset["train"])
+    eval_ds  = (dataset["test"].select(range(task.test_truncation))
+                if task.test_truncation else dataset["test"])
+    return train_ds, eval_ds
+
+
+def _train_tokens_actual(task: TaskConfig, train_ds) -> int:
+    """Total tokens consumed across all epochs, accounting for last-epoch truncation."""
+    last_trunc = _last_epoch_truncation(task, train_ds)
+    tokens_per_epoch = sum(len(ids) for ids in train_ds["input_ids"])
+
+    if last_trunc is None:
+        return tokens_per_epoch * task.num_train_epochs
+
+    full_epochs = task.num_train_epochs - 1
+    last_epoch_ds = train_ds.select(range(last_trunc))
+    last_epoch_tokens = sum(len(ids) for ids in last_epoch_ds["input_ids"])
+    return full_epochs * tokens_per_epoch + last_epoch_tokens
+
+
+def _cleanup(model, tokenizer):
+    del model, tokenizer
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
+
+
+# ── Top-level pipelines ───────────────────────────────────────────────────────
 
 def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1, tag: str = ""):
     print(f"\n{'='*55}")
@@ -172,24 +273,61 @@ def run_task(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1, tag:
 
     tokenizer, collator = build_tokenizer_and_collator(task)
     model = build_model(task, tokenizer)
+    train_ds, eval_ds = _load_datasets(task)
 
-    dataset  = load_from_disk(task.data_path)
-    train_ds = (dataset["train"].select(range(task.train_truncation))
-                if task.train_truncation else dataset["train"])
-    eval_ds  = (dataset["test"].select(range(task.test_truncation))
-                if task.test_truncation else dataset["test"])
-
-    train_tokens = sum(len(ids) for ids in train_ds["input_ids"])
-
+    train_tokens = _train_tokens_actual(task, train_ds)
     train_eval_results = train(model, tokenizer, train_ds, eval_ds,
                                collator, task, train_cfg, seed=run_num)
 
     evaluation = evaluate(task, tokenizer, train_eval_results)
     save_results(evaluation, task, train_cfg, run_num, train_tokens, tag=tag)
 
-    # Free GPU memory before the next task
-    del model, tokenizer
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    gc.collect()
+    _cleanup(model, tokenizer)
 
+
+def run_task_train_only(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1, tag: str = ""):
+    print(f"\n{'='*55}")
+    print(f"  Task (train): {task.name}  [run {run_num}]")
+    print(f"{'='*55}")
+
+    set_seed(run_num)
+
+    tokenizer, collator = build_tokenizer_and_collator(task)
+    model = build_model(task, tokenizer)
+    train_ds, eval_ds = _load_datasets(task)
+
+    train(model, tokenizer, train_ds, eval_ds, collator, task, train_cfg, seed=run_num)
+
+    _cleanup(model, tokenizer)
+
+
+def run_task_eval_only(task: TaskConfig, train_cfg: TrainingConfig, run_num: int = 1, tag: str = ""):
+    print(f"\n{'='*55}")
+    print(f"  Task (eval): {task.name}  [run {run_num}]")
+    print(f"{'='*55}")
+
+    set_seed(run_num)
+
+    tokenizer, collator = build_tokenizer_and_collator(task)
+    train_ds, eval_ds = _load_datasets(task)
+
+    train_tokens = _train_tokens_actual(task, train_ds)
+
+    # Load saved model and compute eval loss to stand in for train_eval_results
+    model = GPTNeoXForCausalLM.from_pretrained(task.model_save_path)
+    eval_args = TrainingArguments(
+        output_dir                  = task.model_save_path,
+        per_device_eval_batch_size  = train_cfg.per_device_eval_batch_size,
+        report_to                   = "none",
+        seed                        = run_num,
+    )
+    trainer = Trainer(
+        model=model, args=eval_args, tokenizer=tokenizer,
+        eval_dataset=eval_ds, data_collator=collator,
+    )
+    train_eval_results = trainer.evaluate()
+
+    evaluation = evaluate(task, tokenizer, train_eval_results)
+    save_results(evaluation, task, train_cfg, run_num, train_tokens, tag=tag)
+
+    _cleanup(model, tokenizer)

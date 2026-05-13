@@ -8,7 +8,7 @@ sys.path.insert(0, "scripts")
 from datasets import load_from_disk
 
 from config import PRETRAIN_CONFIGS, TASK_CONFIGS, TrainingConfig
-from train import run_task
+from train import run_task, run_task_eval_only, run_task_train_only
 
 
 def avg_example_length(dataset_path, sample=1000):
@@ -69,6 +69,12 @@ def main():
         metavar="LABEL",
         help="Optional label written to every row of training_results.csv for grouping runs.",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["train", "eval", "both"],
+        default="both",
+        help="'train': train only (no eval/CSV); 'eval': evaluate a saved model; 'both': train then evaluate (default).",
+    )
     args = parser.parse_args()
 
     if args.runs < 1:
@@ -84,13 +90,19 @@ def main():
 
     produced_in_run = set()
     for name in args.tasks:
-        load_path = all_configs[name].model_load_path
+        task_cfg = all_configs[name]
+        load_path = task_cfg.model_load_path
         if load_path and load_path not in produced_in_run and not os.path.exists(load_path):
             raise FileNotFoundError(
                 f"Task '{name}' requires checkpoint '{load_path}' but it does not exist. "
                 "Run the pre-training task that produces it first."
             )
-        produced_in_run.add(all_configs[name].model_save_path)
+        if args.mode == "eval" and not os.path.exists(task_cfg.model_save_path):
+            raise FileNotFoundError(
+                f"Task '{name}' requires a trained model at '{task_cfg.model_save_path}' "
+                "but it does not exist. Run training first."
+            )
+        produced_in_run.add(task_cfg.model_save_path)
 
     train_cfg = TrainingConfig()
 
@@ -107,7 +119,12 @@ def main():
                     avg_len = avg_example_length(task.data_path)
                     task.train_truncation = int(args.pretrain_tokens // avg_len)
 
-            run_task(task, train_cfg, run_num, args.tag)
+            if args.mode == "train":
+                run_task_train_only(task, train_cfg, run_num, args.tag)
+            elif args.mode == "eval":
+                run_task_eval_only(task, train_cfg, run_num, args.tag)
+            else:
+                run_task(task, train_cfg, run_num, args.tag)
 
 
 if __name__ == "__main__":
