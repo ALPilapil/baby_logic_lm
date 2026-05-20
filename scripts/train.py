@@ -213,7 +213,7 @@ def save_results(
         "warmup_from":  task.model_load_path or "random_init",
         "epochs":       task.num_train_epochs,
         "train_tokens": train_tokens,
-        "total_tokens": train_tokens * task.num_train_epochs,
+        "total_tokens": train_tokens,
         "learning_rate": train_cfg.learning_rate,
         "batch_size":   train_cfg.per_device_train_batch_size,
         "CEL":          evaluation.CEL,
@@ -234,10 +234,10 @@ def save_results(
 
 def _load_datasets(task: TaskConfig):
     dataset  = load_from_disk(task.data_path)
-    train_ds = (dataset["train"].select(range(task.train_truncation))
-                if task.train_truncation else dataset["train"])
-    eval_ds  = (dataset["test"].select(range(task.test_truncation))
-                if task.test_truncation else dataset["test"])
+    train_n  = min(task.train_truncation, len(dataset["train"])) if task.train_truncation else None
+    eval_n   = min(task.test_truncation,  len(dataset["test"]))  if task.test_truncation  else None
+    train_ds = dataset["train"].select(range(train_n)) if train_n else dataset["train"]
+    eval_ds  = dataset["test"].select(range(eval_n))   if eval_n  else dataset["test"]
     return train_ds, eval_ds
 
 

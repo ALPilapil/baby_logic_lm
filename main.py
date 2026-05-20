@@ -22,7 +22,7 @@ def main():
         description="Train baby_logic_lm experiments.",
         epilog=(
             "Example:\n"
-            "  python main.py --tasks paren_pretrain paren_then_next_word "
+            "  python main.py --tasks dyck_pretrain dyck_5m_childes "
             "--epochs 1 --pretrain-tokens 5000000"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -97,14 +97,23 @@ def main():
                 f"Task '{name}' requires checkpoint '{load_path}' but it does not exist. "
                 "Run the pre-training task that produces it first."
             )
-        if args.mode == "eval" and not os.path.exists(task_cfg.model_save_path):
-            raise FileNotFoundError(
-                f"Task '{name}' requires a trained model at '{task_cfg.model_save_path}' "
-                "but it does not exist. Run training first."
+        if args.mode == "eval":
+            run_paths = (
+                [f"{task_cfg.model_save_path}_run{r}" for r in range(1, args.runs + 1)]
+                if args.runs > 1
+                else [task_cfg.model_save_path]
             )
+            missing = [p for p in run_paths if not os.path.exists(p)]
+            if missing:
+                raise FileNotFoundError(
+                    f"Task '{name}' is missing trained models: {missing}. "
+                    "Run training first."
+                )
         produced_in_run.add(task_cfg.model_save_path)
 
     train_cfg = TrainingConfig()
+
+    paths_produced_in_command = {all_configs[n].model_save_path for n in args.tasks}
 
     for run_num in range(1, args.runs + 1):
         for name in args.tasks:
@@ -118,6 +127,11 @@ def main():
                 else:
                     avg_len = avg_example_length(task.data_path)
                     task.train_truncation = int(args.pretrain_tokens // avg_len)
+
+            if args.runs > 1:
+                task.model_save_path = f"{task.model_save_path}_run{run_num}"
+                if task.model_load_path and task.model_load_path in paths_produced_in_command:
+                    task.model_load_path = f"{task.model_load_path}_run{run_num}"
 
             if args.mode == "train":
                 run_task_train_only(task, train_cfg, run_num, args.tag)

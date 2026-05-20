@@ -235,6 +235,7 @@ class Evaluation():
 
   def eval(self, CN, blimp):
     self.blimp = None
+    self.CN = None
     if self.eval_results is None:
       self.perplexity = None
       self.CEL = None

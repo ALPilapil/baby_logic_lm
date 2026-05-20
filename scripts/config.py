@@ -54,7 +54,7 @@ class TaskConfig:
         train_truncation caps the number of training *examples*. Convert a
         target token budget to an example cap as follows:
 
-            paren_pretrain  — examples are exactly 512 tokens (fixed blocks):
+            dyck_pretrain   — examples are exactly 512 tokens (fixed blocks):
                 examples = target_tokens // 512
 
             pos_pretrain    — examples are variable length (≤ 512 tokens);
@@ -108,15 +108,17 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         tokenizer_path   = "./tokenizers/pos_tokenizer",
         num_train_epochs = 1,
         train_truncation = None,   # TODO: set to match CHILDES token budget
+        run_cn           = False,
     ),
 
-    "paren_pretrain": TaskConfig(
-        name             = "paren_pretrain",
+    "dyck_pretrain": TaskConfig(
+        name             = "dyck_pretrain",
         data_path        = "./data/paren/nt_dataset",
         model_save_path  = "./models/pythia/paren-model",
         tokenizer_path   = "./tokenizers/paren_tokenizer",
         num_train_epochs = 1,
         train_truncation = None,   # set at runtime via --pretrain-tokens
+        run_cn           = False,
     ),
 
     # ── 100M pre-training stages ─────────────────────────────────────────────
@@ -129,6 +131,7 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         tokenizer_path   = "./tokenizers/paren_tokenizer",
         num_train_epochs = 1,
         train_truncation = None,
+        run_cn           = False,
     ),
 
     "pos_pretrain_100m": TaskConfig(
@@ -138,6 +141,7 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         tokenizer_path   = "./tokenizers/pos_tokenizer",
         num_train_epochs = 1,
         train_truncation = None,
+        run_cn           = False,
     ),
 }
 
