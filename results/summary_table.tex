@@ -1,0 +1,21 @@
+\begin{table}[ht]
+\centering
+\caption{Summary statistics (mean $\pm$ std across 3 runs) for final-stage models. CN Score = mean rank-difference (mean\_rank[pF] $-$ mean\_rank[pM]) averaged over length-matched sentence pairs; positive values indicate the model assigns lower NLL to the grammatically correct main-auxiliary preposing.}
+\label{{tab:summary}}
+\begin{tabular}{llrrrrrr}
+\toprule
+Token Scale & Paradigm & Mean PPL & Std PPL & Mean CEL & Std CEL & CN Score & CN Score Std \\
+\midrule
+10M & Baseline NTP & 24.0500 & 0.1750 & 3.1801 & 0.0073 & -0.4918 & 0.0661 \\
+10M & Post-train NSP & 17.0060 & 0.1010 & 2.8335 & 0.0060 & -0.2670 & 0.0327 \\
+10M & Post-train NUP & 19.3950 & 0.0490 & 2.9650 & 0.0025 & -0.4455 & 0.0731 \\
+10M & Dyck Pre-train & 27.3810 & 0.1150 & 3.3098 & 0.0042 & -0.5975 & 0.1700 \\
+10M & POS Pre-train & 35.5490 & 0.3030 & 3.5709 & 0.0085 & -0.2560 & 0.0507 \\
+100M & Baseline NTP & 14.2990 & 0.0300 & 2.6602 & 0.0021 & -0.1670 & 0.0933 \\
+100M & Post-train NSP & 25.2240 & 0.0340 & 3.2278 & 0.0013 & -0.3392 & 0.0923 \\
+100M & Post-train NUP & 28.7850 & 0.0310 & 3.3599 & 0.0011 & -0.4269 & 0.0857 \\
+100M & Dyck Pre-train & 15.3630 & 0.0480 & 2.7320 & 0.0031 & -0.2310 & 0.1402 \\
+100M & POS Pre-train & 18.4310 & 0.0210 & 2.9141 & 0.0012 & -0.3071 & 0.0337 \\
+\bottomrule
+\end{tabular}
+\end{table}
