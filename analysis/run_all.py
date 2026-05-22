@@ -12,6 +12,7 @@ MODULES = [
     "plot_cn_heatmap",
     "plot_cn_accuracy",
     "make_summary_table",
+    "plot_babylm",
 ]
 
 

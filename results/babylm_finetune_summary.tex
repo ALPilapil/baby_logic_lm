@@ -1,0 +1,21 @@
+\begin{table}[ht]
+\centering
+\caption{BabyLM evaluation results (mean $\pm$ std across 3 runs).}
+\label{tab:babylm}
+\begin{tabular}{llrrrrrrr}
+\toprule
+Scale & Paradigm & BoolQ & MNLI & MRPC & MultiRC & QQP & RTE & WSC \\
+\midrule
+10M & Baseline NTP & 69.01$\pm$0.71 & 34.67$\pm$0.40 & 80.79$\pm$0.07 & 58.94$\pm$0.68 & 1.17$\pm$0.09 & 52.76$\pm$0.42 & 61.54$\pm$0.00 \\
+10M & Post-train NSP & 64.77$\pm$1.00 & 34.15$\pm$0.06 & 80.71$\pm$0.43 & 56.97$\pm$0.47 & 1.59$\pm$0.89 & 51.80$\pm$1.25 & 61.54$\pm$0.00 \\
+10M & Post-train NUP & 65.79$\pm$0.21 & 34.47$\pm$0.21 & 80.35$\pm$0.35 & 57.25$\pm$0.24 & 1.45$\pm$0.93 & 54.92$\pm$2.19 & 61.54$\pm$0.00 \\
+10M & Dyck Pre-train & 68.89$\pm$0.18 & 34.54$\pm$0.12 & 80.63$\pm$0.27 & 58.97$\pm$0.69 & 1.18$\pm$0.02 & 54.44$\pm$0.42 & 61.54$\pm$0.00 \\
+10M & POS Pre-train & 68.58$\pm$0.70 & 34.52$\pm$0.29 & 81.09$\pm$0.18 & 58.79$\pm$1.07 & 1.10$\pm$0.10 & 54.20$\pm$1.81 & 61.54$\pm$0.00 \\
+100M & Baseline NTP & 68.54$\pm$0.14 & 34.59$\pm$0.20 & 80.64$\pm$0.37 & 58.32$\pm$0.48 & 1.37$\pm$0.41 & 52.04$\pm$2.08 & 61.54$\pm$0.00 \\
+100M & Post-train NSP & 67.79$\pm$0.57 & 34.48$\pm$0.21 & 80.08$\pm$0.59 & 57.40$\pm$0.66 & 1.13$\pm$0.13 & 54.68$\pm$3.60 & 61.54$\pm$0.00 \\
+100M & Post-train NUP & 68.30$\pm$0.43 & 34.64$\pm$0.26 & 80.24$\pm$0.60 & 57.87$\pm$0.50 & 1.37$\pm$0.51 & 53.00$\pm$2.20 & 61.54$\pm$0.00 \\
+100M & Dyck Pre-train & 69.11$\pm$0.32 & 34.82$\pm$0.43 & 80.44$\pm$0.42 & 57.74$\pm$0.32 & 1.10$\pm$0.07 & 52.52$\pm$0.72 & 61.54$\pm$0.00 \\
+100M & POS Pre-train & 69.23$\pm$0.72 & 34.69$\pm$0.10 & 80.94$\pm$0.21 & 59.14$\pm$0.77 & 1.42$\pm$1.10 & 53.72$\pm$0.42 & 61.54$\pm$0.00 \\
+\bottomrule
+\end{tabular}
+\end{table}

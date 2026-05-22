@@ -16,6 +16,8 @@ pythia/
 
 # other
 tests/
+CLAUDE.md
+
 # python cache
 __pycache__/
 *.pyc
