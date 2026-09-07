@@ -1,7 +1,8 @@
 """
 dataprep.py — tokenizes and saves all three datasets to disk.
 
-Run after format.py has produced the raw text / jsonl files.
+Run after format.py has produced the raw text / jsonl files (and, for
+--paren, after make_paren.py has produced tokenized_paren.txt).
 
 Usage
 -----
@@ -12,7 +13,8 @@ Datasets are saved to tokenizer-specific subdirectories so that running
 with different tokenizers never overwrites each other:
 
     base tokenizer  →  ./data/base/nt_dataset, ./data/base/nsp_dataset, ...
-    paren tokenizer →  ./data/paren/nt_dataset, ./data/paren/nsp_dataset, ...
+    paren tokenizer →  ./data/paren/nt_dataset   (Dyck sequences only —
+                        no NSP/NUP counterpart exists for this condition)
 """
 
 import argparse
@@ -142,19 +144,26 @@ def main():
     args = parser.parse_args()
 
     if args.paren:
-        tokenizer_id = "./tokenizers/paren_tokenizer"
-        data_dir = "./data/paren"
-    else:
-        tokenizer_id = "EleutherAI/pythia-160m"
-        data_dir = "./data/base"
+        tokenizer = AutoTokenizer.from_pretrained("./tokenizers/paren_tokenizer")
+        print("Using tokenizer: ./tokenizers/paren_tokenizer")
+        print("Saving dataset to: ./data/paren/")
 
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
-    print(f"Using tokenizer: {tokenizer_id}")
-    print(f"Saving datasets to: {data_dir}/")
+        # Dyck pre-training trains on the special-token-converted integer
+        # sequences (see make_paren.py), not on CHILDES text.
+        make_nt_dataset(
+            "./pre-predata/tokenized_paren/tokenized_paren.txt",
+            "./data/paren/nt_dataset",
+            tokenizer,
+        )
+        return
 
-    make_nt_dataset("./data/nt_text.txt", f"{data_dir}/nt_dataset", tokenizer)
-    make_pair_dataset("./data/nsp_text.jsonl", f"{data_dir}/nsp_dataset", tokenizer)
-    make_pair_dataset("./data/nup_text.jsonl", f"{data_dir}/nup_dataset", tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-160m")
+    print("Using tokenizer: EleutherAI/pythia-160m")
+    print("Saving datasets to: ./data/base/")
+
+    make_nt_dataset("./data/nt_text.txt", "./data/base/nt_dataset", tokenizer)
+    make_pair_dataset("./data/nsp_text.jsonl", "./data/base/nsp_dataset", tokenizer)
+    make_pair_dataset("./data/nup_text.jsonl", "./data/base/nup_dataset", tokenizer)
 
 
 if __name__ == "__main__":

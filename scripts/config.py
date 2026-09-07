@@ -73,8 +73,10 @@ class TaskConfig:
     train_truncation    : cap training examples (None = full dataset)
     test_truncation     : cap eval examples    (None = full dataset)
     eval_truncation     : cap BLiMP test files (None = all 67)
-    run_cn              : whether to run CN evaluation
-    run_blimp           : whether to run BLiMP evaluation
+    run_cn              : whether to run CN evaluation (default True)
+    run_blimp           : whether to run BLiMP evaluation (default True; set False
+                          for pre-training-only checkpoints that aren't meant to
+                          be evaluated as English models)
     """
     name:                str
     data_path:           str
@@ -87,7 +89,7 @@ class TaskConfig:
     test_truncation:     Optional[int] = None
     eval_truncation:     Optional[int] = None
     run_cn:              bool          = True
-    run_blimp:           bool          = False
+    run_blimp:           bool          = True
     lock_epochs:         bool          = False  # if True, --epochs does not override num_train_epochs
     token_limit:         Optional[int] = None   # if set, last CHILDES epoch is truncated to stay under this
 
@@ -109,6 +111,7 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 1,
         train_truncation = None,   # TODO: set to match CHILDES token budget
         run_cn           = False,
+        run_blimp        = False,
     ),
 
     "dyck_pretrain": TaskConfig(
@@ -119,6 +122,7 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 1,
         train_truncation = None,   # set at runtime via --pretrain-tokens
         run_cn           = False,
+        run_blimp        = False,
     ),
 
     # ── 100M pre-training stages ─────────────────────────────────────────────
@@ -132,6 +136,7 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 1,
         train_truncation = None,
         run_cn           = False,
+        run_blimp        = False,
     ),
 
     "pos_pretrain_100m": TaskConfig(
@@ -142,6 +147,7 @@ PRETRAIN_CONFIGS: dict[str, TaskConfig] = {
         num_train_epochs = 1,
         train_truncation = None,
         run_cn           = False,
+        run_blimp        = False,
     ),
 }
 
@@ -267,6 +273,14 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
     #   baseline:      4 × 48828 × 512 = 99,999,744  (~100M)
     #   post-training: (4 × 24414 × 512) × 2 stages  = 99,997,696  (~100M)
     #   pre-training:  50M pre-train + 2 × 48828 × 512 = 49,999,872  (~50M CHILDES)
+    #
+    # NOTE: the "× 512" math above only holds for the fixed-block NT dataset
+    # (ntp_100m, ntp_100m_for_nsp, ntp_100m_for_nup, dyck/pos_100m_childes).
+    # nsp_100m / nup_100m use variable-length sequence-pair examples, so their
+    # train_truncation=24414 below is only a placeholder — main.py recomputes
+    # it at runtime from the dataset's real average example length (see the
+    # `token_limit and use_custom_collator` branch in main.py) so the actual
+    # per-epoch token count matches token_limit / num_train_epochs.
 
     # Baseline: 4 epochs, truncated to 48828 examples → ≤100M tokens (last epoch truncated at runtime)
     "ntp_100m": TaskConfig(

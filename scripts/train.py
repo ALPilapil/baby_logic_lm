@@ -53,8 +53,7 @@ def build_tokenizer_and_collator(task: TaskConfig):
 def build_model(task: TaskConfig, tokenizer) -> GPTNeoXForCausalLM:
     if task.model_load_path is None:
         config = AutoConfig.from_pretrained(BASE_MODEL_ID)
-        model = GPTNeoXForCausalLM(config)
-        model.apply(model._init_weights)
+        model = GPTNeoXForCausalLM(config)  # __init__ already runs _init_weights via post_init()
         print(f"  Initialized fresh model from {BASE_MODEL_ID} config")
     else:
         model = GPTNeoXForCausalLM.from_pretrained(task.model_load_path)
@@ -182,8 +181,9 @@ def train(
 # ── Evaluation ────────────────────────────────────────────────────────────────
 
 def evaluate(task: TaskConfig, tokenizer, train_eval_results: dict) -> Evaluation:
-    model = GPTNeoXForCausalLM.from_pretrained(task.model_save_path)
-    print(f"  Running evaluation for: {task.name}")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = GPTNeoXForCausalLM.from_pretrained(task.model_save_path).to(device)
+    print(f"  Running evaluation for: {task.name} (device={device})")
 
     evaluation = Evaluation(
         model        = model,

@@ -128,6 +128,18 @@ def main():
                     avg_len = avg_example_length(task.data_path)
                     task.train_truncation = int(args.pretrain_tokens // avg_len)
 
+            elif task.token_limit and task.use_custom_collator:
+                # NSP/NUP examples are two short utterances + EOS tokens, not
+                # fixed 512-token blocks, so the hardcoded train_truncation in
+                # config.py (sized assuming ~512 tokens/example) can silently
+                # under-shoot task.token_limit. Recompute it from the real
+                # average example length so each epoch uses roughly
+                # token_limit / num_train_epochs tokens as intended.
+                avg_len = avg_example_length(task.data_path)
+                per_epoch_budget = task.token_limit / task.num_train_epochs
+                dataset_size = len(load_from_disk(task.data_path)["train"])
+                task.train_truncation = min(int(per_epoch_budget // avg_len), dataset_size)
+
             if args.runs > 1:
                 task.model_save_path = f"{task.model_save_path}_run{run_num}"
                 if task.model_load_path and task.model_load_path in paths_produced_in_command:

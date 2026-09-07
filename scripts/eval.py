@@ -113,19 +113,49 @@ def process_blimp_score(total_score):
 #----------- MAIN EVAL FUNCTION -----------#
 #------------------------------------------#
 class Evaluation():
-  def __init__(self, model, tokenizer, eval_results, truncation=None):
+  def __init__(self, model, tokenizer, eval_results, truncation=None, batch_size=32):
     self.model = model
     self.tokenizer = tokenizer
     self.eval_results = eval_results
     self.truncation = truncation
+    self.batch_size = batch_size
+    self.device = next(model.parameters()).device
+    # Right-padding is required: causal attention lets trailing pad tokens
+    # not affect earlier real-token predictions, so per-example NLL stays
+    # correct regardless of batch composition.
+    self.tokenizer.padding_side = "right"
 
   def sentence_nll(self, sentence):
-    inputs = self.tokenizer(sentence, return_tensors="pt")
-    with torch.no_grad():
-        outputs = self.model(**inputs, labels=inputs["input_ids"])
-        # Hugging Face returns loss = average negative log-likelihood
-        nll = outputs.loss.item() * (inputs["input_ids"].size(1) - 1)  # total NLL
-    return nll
+    """Total NLL for a single sentence. Kept for compatibility; prefer nll_batch."""
+    return self.nll_batch([sentence])[0]
+
+  def nll_batch(self, sentences):
+    '''
+    Compute total NLL for each sentence via batched forward passes on
+    self.device (instead of one CPU forward pass per sentence).
+
+    Returns a list of floats aligned with `sentences`.
+    '''
+    results = []
+    for i in range(0, len(sentences), self.batch_size):
+      chunk = sentences[i:i + self.batch_size]
+      inputs = self.tokenizer(chunk, return_tensors="pt", padding=True)
+      inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+      with torch.no_grad():
+        logits = self.model(**inputs).logits
+
+      shift_logits = logits[:, :-1, :]
+      shift_labels = inputs["input_ids"][:, 1:]
+      shift_mask   = inputs["attention_mask"][:, 1:].float()
+
+      token_nll = torch.nn.functional.cross_entropy(
+          shift_logits.transpose(1, 2), shift_labels, reduction="none"
+      )
+      nll_per_example = (token_nll * shift_mask).sum(dim=1)
+      results.extend(nll_per_example.tolist())
+
+    return results
 
   def CN_test(self, file_path):
     '''
@@ -149,8 +179,7 @@ class Evaluation():
 
       # Process when we have 12 candidates OR at the end
       if i % 12 == 0:
-        results = map(self.sentence_nll, candidates)
-        scores_log.append(list(results))
+        scores_log.append(self.nll_batch(candidates))
 
         # reset batch
         candidates = []
@@ -164,22 +193,17 @@ class Evaluation():
     input: file path
     output: ratio of good vs bad sentences picked
     """
-    total_score = []
+    good_sentences, bad_sentences = [], []
 
     with open(file_path, 'r', encoding='utf-8') as f:
-      for line_num, line in enumerate(f, 1):
-        # parse each line as JSON
+      for line in f:
         data = json.loads(line.strip())
+        good_sentences.append(data["sentence_good"])
+        bad_sentences.append(data["sentence_bad"])
 
-        # set the good and bad sentence
-        good_sentence = data["sentence_good"]
-        bad_sentence = data["sentence_bad"]
-
-        # get score
-        score_one = self.sentence_nll(good_sentence)
-        score_two = self.sentence_nll(bad_sentence)
-
-        total_score.append((score_one, score_two))
+    good_scores = self.nll_batch(good_sentences)
+    bad_scores = self.nll_batch(bad_sentences)
+    total_score = list(zip(good_scores, bad_scores))
 
     ratio = process_blimp_score(total_score)
     return ratio
@@ -228,8 +252,8 @@ class Evaluation():
     good_sentences = cola_test[cola_test['type'] == 1]['sentence'].tolist()
 
     # then run nll on them
-    bad_results = np.mean(list(map(self.sentence_nll, bad_sentences)))
-    good_results = np.mean(list(map(self.sentence_nll, good_sentences)))
+    bad_results = np.mean(self.nll_batch(bad_sentences))
+    good_results = np.mean(self.nll_batch(good_sentences))
 
     return {"bad": bad_results, "good": good_results}
 
