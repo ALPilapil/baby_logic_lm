@@ -1,0 +1,11 @@
+defaults:
+  - schema
+  - _self_
+
+# 5. NTP -> NUP fine-tune
+name: next_word_then_nup
+data_path: ./data/base/nup_dataset
+model_save_path: ./models/pythia/nt-nup-model
+model_load_path: ./models/pythia/nt-model
+num_train_epochs: 1
+use_custom_collator: true

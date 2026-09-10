@@ -1,0 +1,13 @@
+defaults:
+  - schema
+  - _self_
+
+name: pos_pretrain
+data_path: ./data/pos_dataset
+model_save_path: ./models/pythia/pos-model
+tokenizer_path: ./tokenizers/pos_tokenizer
+num_train_epochs: 1
+train_truncation: null  # set at runtime via --pretrain-tokens
+run_cn: false
+run_blimp: false
+is_pretrain: true

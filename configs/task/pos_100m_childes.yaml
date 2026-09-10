@@ -1,0 +1,13 @@
+defaults:
+  - schema
+  - _self_
+
+# POS 100M: 50M POS pre-train -> 2 epochs CHILDES -> <=50M CHILDES tokens
+name: pos_100m_childes
+data_path: ./data/base/nt_dataset
+model_save_path: ./models/pythia/pos_100m_childes_model
+model_load_path: ./models/pythia/pos_100m_model
+num_train_epochs: 2
+train_truncation: 48828
+lock_epochs: true
+token_limit: 50000000

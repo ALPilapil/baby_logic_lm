@@ -1,0 +1,9 @@
+defaults:
+  - schema
+  - _self_
+
+# Post-training NSP: stage 1 (NTP on first 5M)
+name: ntp_10m_for_nsp
+data_path: ./data/split/nt_5m_a
+model_save_path: ./models/pythia/ntp_10m_nsp_model
+num_train_epochs: 1

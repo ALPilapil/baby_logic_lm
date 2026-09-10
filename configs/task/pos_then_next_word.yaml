@@ -1,0 +1,10 @@
+defaults:
+  - schema
+  - _self_
+
+# 2. POS pre-train -> NTP fine-tune
+name: pos_then_next_word
+data_path: ./data/base/nt_dataset
+model_save_path: ./models/pythia/pos-nt-model
+model_load_path: ./models/pythia/pos-model
+num_train_epochs: 1

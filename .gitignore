@@ -15,8 +15,8 @@ data/
 pythia/
 
 # other
-tests/
 CLAUDE.md
+training_sesh2.txt
 
 # python cache
 __pycache__/
@@ -24,3 +24,12 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+.pytest_cache/
+
+# poetry
+.venv/
+
+# hydra run/sweep output
+outputs/
+multirun/
+*.egg-info/

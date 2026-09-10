@@ -1,0 +1,10 @@
+defaults:
+  - schema
+  - _self_
+
+# 10M conditions (all 1 epoch, split datasets from data/split/, see
+# scripts/make_split_datasets.py). Baseline.
+name: ntp_10m
+data_path: ./data/split/nt_10m
+model_save_path: ./models/pythia/ntp_10m_model
+num_train_epochs: 1

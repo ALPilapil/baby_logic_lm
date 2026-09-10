@@ -1,0 +1,14 @@
+defaults:
+  - schema
+  - _self_
+
+# Cheap dev/CI fixture: tiny truncation, CN/BLiMP off, for pipeline smoke
+# tests -- not a real experimental condition.
+name: smoke
+data_path: ./data/split/nt_10m
+model_save_path: ./models/pythia/smoke_model
+num_train_epochs: 1
+train_truncation: 4
+test_truncation: 4
+run_cn: false
+run_blimp: false

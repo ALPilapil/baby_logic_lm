@@ -1,0 +1,11 @@
+defaults:
+  - schema
+  - _self_
+
+# Post-training NSP: stage 2 (NSP on second 5M)
+name: nsp_10m
+data_path: ./data/split/nsp_5m_b
+model_save_path: ./models/pythia/nsp_10m_model
+model_load_path: ./models/pythia/ntp_10m_nsp_model
+num_train_epochs: 1
+use_custom_collator: true

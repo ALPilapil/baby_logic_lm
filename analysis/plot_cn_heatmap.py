@@ -6,7 +6,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
-import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 from data_utils import load_data, PARADIGM_ORDER, CN_SHORT_LABELS, CHANCE, GRAMMATICAL_POSITIONS

@@ -1,0 +1,11 @@
+defaults:
+  - schema
+  - _self_
+
+# Post-training NUP: stage 2 (NUP on second 5M)
+name: nup_10m
+data_path: ./data/split/nup_5m_b
+model_save_path: ./models/pythia/nup_10m_model
+model_load_path: ./models/pythia/ntp_10m_nup_model
+num_train_epochs: 1
+use_custom_collator: true

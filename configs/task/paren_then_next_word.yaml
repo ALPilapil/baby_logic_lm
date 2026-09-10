@@ -1,0 +1,10 @@
+defaults:
+  - schema
+  - _self_
+
+# 3. Paren pre-train -> NTP fine-tune
+name: paren_then_next_word
+data_path: ./data/base/nt_dataset
+model_save_path: ./models/pythia/paren-nt-model
+model_load_path: ./models/pythia/paren-model
+num_train_epochs: 1

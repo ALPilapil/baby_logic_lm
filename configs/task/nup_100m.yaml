@@ -1,0 +1,15 @@
+defaults:
+  - schema
+  - _self_
+
+# Post-training NUP: stage 2. train_truncation is a placeholder, recomputed
+# at runtime (see nsp_100m.yaml comment).
+name: nup_100m
+data_path: ./data/split/nup_half_b
+model_save_path: ./models/pythia/nup_100m_model
+model_load_path: ./models/pythia/ntp_100m_nup_model
+num_train_epochs: 4
+train_truncation: 24414
+use_custom_collator: true
+lock_epochs: true
+token_limit: 50000000

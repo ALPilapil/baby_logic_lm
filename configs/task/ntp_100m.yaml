@@ -1,0 +1,13 @@
+defaults:
+  - schema
+  - _self_
+
+# 100M conditions (lock_epochs=true; epochs set here, not via --epochs).
+# Hard cap: <=100M tokens. Baseline: 4 x 48828 x 512 = 99,999,744 (~100M)
+name: ntp_100m
+data_path: ./data/base/nt_dataset
+model_save_path: ./models/pythia/ntp_100m_model
+num_train_epochs: 4
+train_truncation: 48828
+lock_epochs: true
+token_limit: 100000000

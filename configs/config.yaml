@@ -1,0 +1,10 @@
+defaults:
+  - config_schema
+  - model: pythia_160m
+  - training: default
+  - wandb: default
+  - task: next_word
+  - _self_
+
+seed: 1
+tag: ""

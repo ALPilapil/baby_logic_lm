@@ -1,0 +1,22 @@
+defaults:
+  - schema
+  - _self_
+
+# Pinned locally instead of fetched from the HF Hub at train time. Verified
+# against EleutherAI/pythia-160m's real config.json in tests/test_model_build.py.
+name: pythia-160m
+vocab_size: 50304
+hidden_size: 768
+num_hidden_layers: 12
+num_attention_heads: 12
+intermediate_size: 3072
+hidden_act: gelu
+rotary_pct: 0.25
+rotary_emb_base: 10000
+max_position_embeddings: 2048
+layer_norm_eps: 1e-5
+initializer_range: 0.02
+use_parallel_residual: true
+tie_word_embeddings: false
+bos_token_id: 0
+eos_token_id: 0

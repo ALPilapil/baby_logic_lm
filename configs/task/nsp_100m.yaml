@@ -1,0 +1,17 @@
+defaults:
+  - schema
+  - _self_
+
+# Post-training NSP: stage 2. train_truncation is a placeholder -- NSP examples
+# are variable-length sequence pairs, not fixed 512-token blocks, so
+# cli/pipeline.py recomputes it at runtime from the real average example
+# length (the token_limit + use_custom_collator branch).
+name: nsp_100m
+data_path: ./data/split/nsp_half_b
+model_save_path: ./models/pythia/nsp_100m_model
+model_load_path: ./models/pythia/ntp_100m_nsp_model
+num_train_epochs: 4
+train_truncation: 24414
+use_custom_collator: true
+lock_epochs: true
+token_limit: 50000000

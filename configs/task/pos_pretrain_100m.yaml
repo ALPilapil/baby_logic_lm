@@ -1,0 +1,14 @@
+defaults:
+  - schema
+  - _self_
+
+# train_truncation set at runtime via --pretrain-tokens 39600000
+name: pos_pretrain_100m
+data_path: ./data/pos_dataset
+model_save_path: ./models/pythia/pos_100m_model
+tokenizer_path: ./tokenizers/pos_tokenizer
+num_train_epochs: 1
+train_truncation: null
+run_cn: false
+run_blimp: false
+is_pretrain: true

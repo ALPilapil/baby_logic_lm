@@ -1,0 +1,11 @@
+defaults:
+  - schema
+  - _self_
+
+# Dyck pre-training: 5M paren -> random 5M CHILDES (train_truncation ~= 9765 examples)
+name: dyck_5m_childes
+data_path: ./data/base/nt_dataset
+model_save_path: ./models/pythia/dyck_5m_childes_model
+model_load_path: ./models/pythia/paren-model
+num_train_epochs: 1
+train_truncation: 9765  # 9765 x 512 ~= 5M tokens

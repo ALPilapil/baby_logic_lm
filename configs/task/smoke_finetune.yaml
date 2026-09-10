@@ -1,0 +1,15 @@
+defaults:
+  - schema
+  - _self_
+
+# Cheap dev/CI fixture exercising checkpoint-chaining (paired with
+# smoke_pretrain.yaml) -- not a real experimental condition.
+name: smoke_finetune
+data_path: ./data/split/nt_10m
+model_save_path: ./models/pythia/smoke_finetune_model
+model_load_path: ./models/pythia/smoke_pretrain_model
+num_train_epochs: 1
+train_truncation: 4
+test_truncation: 4
+run_cn: false
+run_blimp: false

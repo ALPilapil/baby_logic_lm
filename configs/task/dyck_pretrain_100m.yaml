@@ -1,0 +1,14 @@
+defaults:
+  - schema
+  - _self_
+
+# train_truncation set at runtime via --pretrain-tokens 39600000
+name: dyck_pretrain_100m
+data_path: ./data/paren/nt_dataset
+model_save_path: ./models/pythia/dyck_100m_model
+tokenizer_path: ./tokenizers/paren_tokenizer
+num_train_epochs: 1
+train_truncation: null
+run_cn: false
+run_blimp: false
+is_pretrain: true

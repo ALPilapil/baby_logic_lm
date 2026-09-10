@@ -19,9 +19,15 @@ C4 (used for POS pre-training) is streamed directly from HuggingFace — no manu
 
 ## Installation
 
+Dependencies are managed with [Poetry](https://python-poetry.org/) (requires Python >=3.10,<3.14 — torch 2.8.0 has no wheels for 3.14+).
+
 ```bash
-pip install -r requirements.txt
+poetry install
 ```
+
+This creates a `.venv` in the project root and installs the `baby_logic_lm` package (under `src/`) in editable mode. Run any command from this README/CLAUDE.md by prefixing it with `poetry run`, e.g. `poetry run python -m baby_logic_lm.cli.pipeline --tasks ntp_10m --epochs 1`, or activate the environment first with `poetry env activate` (or `poetry shell` if the shell plugin is installed).
+
+CUDA runtime packages (`nvidia-cu12-*`, `triton`) are marked Linux-only in `pyproject.toml` and are skipped automatically on macOS; they install automatically on a Linux/CUDA training box.
 
 ---
 
@@ -55,7 +61,7 @@ There are two experiment suites (10M and 100M tokens), each with 5 conditions. E
 
 ## Pipeline Overview
 
-Data prep scripts run once to build datasets on disk. `main.py` then reads those datasets to train and evaluate — it does not call any data prep scripts itself.
+Data prep scripts run once to build datasets on disk. `baby_logic_lm.cli.pipeline` then reads those datasets to train and evaluate — it does not call any data prep scripts itself.
 
 ```
 Step 1  format.py               →  data/nt_text.txt, nsp_text.jsonl, nup_text.jsonl
@@ -66,7 +72,7 @@ Step 4  dataprep.py             →  data/base/{nt,nsp,nup}_dataset
 Step 5  make_split_datasets.py  →  data/split/{nt_10m, nt_5m_a, nt_half_a,
                                               nsp_5m_b, nsp_half_b,
                                               nup_5m_b, nup_half_b}
-Step 6  main.py                 →  trained models, training_results.csv
+Step 6  cli.pipeline            →  trained models, training_results.csv
 ```
 
 Steps 2–4 (paren) are only needed for paren experiments.
@@ -163,27 +169,35 @@ Outputs:
 ### Step 6 — Train
 
 ```bash
-python main.py --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>] [--runs <n>] [--tag <label>]
+python -m baby_logic_lm.cli.pipeline --tasks <task1> [task2 ...] --epochs <n> [--pretrain-tokens <n>] [--runs <n>] [--tag <label>]
 ```
 
 | Argument | Description |
 |----------|-------------|
-| `--tasks` | Ordered list of task keys to run (see conditions table above) |
+| `--tasks` | Ordered list of task keys to run (see conditions table above; keys are the YAML file stems under `configs/task/`) |
 | `--epochs` | `num_train_epochs` applied to every task in the run |
 | `--pretrain-tokens` | Token budget for pre-training stages; auto-computes `train_truncation` |
 | `--runs` | Number of times to repeat the full task sequence (default: `1`). Each run uses its index as the random seed, so results are statistically independent. |
 | `--tag` | Optional label written to every row of `training_results.csv` for grouping runs (e.g. `pilot`, `final`). |
 
-Each task trains the model, evaluates it (CN + BLiMP), and appends a row to `training_results.csv`. Tasks run sequentially; GPU memory is freed between them.
+Each task trains the model, evaluates it (CN + BLiMP), and appends a row to `training_results.csv`. Tasks run sequentially; GPU memory is freed between them. Training metrics and final CN/BLiMP/perplexity are also logged to Weights & Biases (set `wandb.mode=offline` or `disabled` via a Hydra override, or edit `configs/wandb/default.yaml`, to disable cloud syncing).
+
+For a single task, `baby_logic_lm.cli.train` is a plain Hydra entry point that also supports arbitrary config overrides and genuine multirun sweeps (not available via `cli.pipeline`, whose `--tasks` sequences are stateful/checkpoint-chained rather than independent trials):
+
+```bash
+python -m baby_logic_lm.cli.train task=ntp_10m training.num_train_epochs=5
+python -m baby_logic_lm.cli.train -m task=ntp_10m,ntp_100m training.learning_rate=1e-4,2.5e-4
+```
 
 ---
 
 ## Running Experiments
 
-The simplest way to run all experiments is `run.sh`, which covers both suites in order:
+The simplest way to run all experiments is `run_train.sh` (training) and `run_eval.sh` (re-evaluation), which each cover both suites in order:
 
 ```bash
-bash run.sh
+bash run_train.sh
+bash run_eval.sh
 ```
 
 To run individual conditions:
@@ -192,43 +206,43 @@ To run individual conditions:
 
 ```bash
 # 1. Baseline NTP
-python main.py --tasks ntp_10m --epochs 1 --runs 3 --tag "10m"
+python -m baby_logic_lm.cli.pipeline --tasks ntp_10m --epochs 1 --runs 3 --tag "10m"
 
 # 2. Post-training NSP
-python main.py --tasks ntp_10m_for_nsp nsp_10m --epochs 1 --runs 3 --tag "10m"
+python -m baby_logic_lm.cli.pipeline --tasks ntp_10m_for_nsp nsp_10m --epochs 1 --runs 3 --tag "10m"
 
 # 3. Post-training NUP
-python main.py --tasks ntp_10m_for_nup nup_10m --epochs 1 --runs 3 --tag "10m"
+python -m baby_logic_lm.cli.pipeline --tasks ntp_10m_for_nup nup_10m --epochs 1 --runs 3 --tag "10m"
 
 # 4. Dyck pre-training → CHILDES NTP
-python main.py --tasks dyck_pretrain dyck_5m_childes \
+python -m baby_logic_lm.cli.pipeline --tasks dyck_pretrain dyck_5m_childes \
                --epochs 1 --pretrain-tokens 5000000 --runs 3 --tag "10m"
 
 # 5. POS pre-training → CHILDES NTP
-python main.py --tasks pos_pretrain pos_5m_childes \
+python -m baby_logic_lm.cli.pipeline --tasks pos_pretrain pos_5m_childes \
                --epochs 1 --pretrain-tokens 5000000 --runs 3 --tag "10m"
 ```
 
 ### 100M suite
 
-The 100M tasks use `lock_epochs=True` in config, so their epoch counts (3) are not overridden by `--epochs`. Pass `--epochs 1` only to cap the pre-training stage.
+The 100M tasks set `lock_epochs: true` in their config, so their epoch counts (3) are not overridden by `--epochs`. Pass `--epochs 1` only to cap the pre-training stage.
 
 ```bash
 # 1. Baseline NTP (3 epochs × full CHILDES)
-python main.py --tasks ntp_100m --runs 3 --tag "100m"
+python -m baby_logic_lm.cli.pipeline --tasks ntp_100m --runs 3 --tag "100m"
 
 # 2. Post-training NSP
-python main.py --tasks ntp_100m_for_nsp nsp_100m --runs 3 --tag "100m"
+python -m baby_logic_lm.cli.pipeline --tasks ntp_100m_for_nsp nsp_100m --runs 3 --tag "100m"
 
 # 3. Post-training NUP
-python main.py --tasks ntp_100m_for_nup nup_100m --runs 3 --tag "100m"
+python -m baby_logic_lm.cli.pipeline --tasks ntp_100m_for_nup nup_100m --runs 3 --tag "100m"
 
 # 4. Dyck pre-training → CHILDES NTP
-python main.py --tasks dyck_pretrain_100m dyck_100m_childes \
+python -m baby_logic_lm.cli.pipeline --tasks dyck_pretrain_100m dyck_100m_childes \
                --epochs 1 --pretrain-tokens 39600000 --runs 3 --tag "100m"
 
 # 5. POS pre-training → CHILDES NTP
-python main.py --tasks pos_pretrain_100m pos_100m_childes \
+python -m baby_logic_lm.cli.pipeline --tasks pos_pretrain_100m pos_100m_childes \
                --epochs 1 --pretrain-tokens 39600000 --runs 3 --tag "100m"
 ```
 
@@ -237,7 +251,7 @@ python main.py --tasks pos_pretrain_100m pos_100m_childes \
 `--pretrain-tokens` caps how many tokens are used from the (much larger) pre-training dataset:
 
 - **paren / dyck** — examples are exactly 512 tokens: `train_truncation = pretrain_tokens // 512`
-- **pos** — examples are variable length: `main.py` computes the average automatically
+- **pos** — examples are variable length: `cli.pipeline` computes the average automatically
 
 Set `--pretrain-tokens` to match the CHILDES token count for a fair comparison (5M for 10M suite, 39.6M for 100M suite).
 
@@ -245,23 +259,26 @@ Set `--pretrain-tokens` to match the CHILDES token count for a fair comparison (
 
 ## Configuration
 
-All configuration lives in `scripts/config.py`.
+All configuration lives under `configs/`, composed via [Hydra](https://hydra.cc) against the structured schema in `src/baby_logic_lm/config_schema.py`.
 
-**`TrainingConfig`** — optimizer hyperparameters shared across all tasks (learning rate, batch size, scheduler, etc.).
+**`configs/model/pythia_160m.yaml`** (`ModelConfig`) — the GPTNeoX architecture, pinned locally (hidden size, layers, heads, etc.) instead of fetched implicitly from the HF Hub at train time.
 
-**`TaskConfig`** — one entry per task. Key fields:
+**`configs/training/default.yaml`** (`TrainingConfig`) — optimizer hyperparameters shared across all tasks (learning rate, batch size, scheduler, etc.).
+
+**`configs/wandb/default.yaml`** (`WandbConfig`) — Weights & Biases project/entity/mode.
+
+**`configs/task/*.yaml`** (`TaskConfig`) — one file per task. Key fields:
 
 | Field | Description |
 |-------|-------------|
-| `num_train_epochs` | Epochs over the training set (overridden by `--epochs` unless `lock_epochs=True`) |
-| `lock_epochs` | If `True`, `--epochs` does not override `num_train_epochs` (used for 100M conditions) |
+| `num_train_epochs` | Epochs over the training set (overridden by `--epochs` unless `lock_epochs: true`) |
+| `lock_epochs` | If `true`, `--epochs` does not override `num_train_epochs` (used for 100M conditions) |
 | `train_truncation` | Cap training examples (overridden by `--pretrain-tokens` for pre-train tasks) |
-| `model_load_path` | Checkpoint to warm-start from; `None` = random init |
-| `use_custom_collator` | `True` for NSP / NUP tasks |
+| `model_load_path` | Checkpoint to warm-start from; `null` = random init |
+| `use_custom_collator` | `true` for NSP / NUP tasks |
+| `is_pretrain` | `true` for intermediate pre-training stages (`pos_pretrain`, `dyck_pretrain`, `dyck_pretrain_100m`, `pos_pretrain_100m`) whose checkpoints are consumed by fine-tuning tasks |
 
-**`PRETRAIN_CONFIGS`** — intermediate pre-training stages that produce checkpoints consumed by fine-tuning tasks: `pos_pretrain`, `paren_pretrain` (10M); `dyck_pretrain_100m`, `pos_pretrain_100m` (100M).
-
-**`TASK_CONFIGS`** — all experimental conditions: the original 5 full-CHILDES conditions plus the 10M and 100M split-dataset conditions.
+To add a new experimental condition, add a `configs/task/<name>.yaml` file setting whatever fields differ from `TaskConfig`'s defaults — nothing else needs to change. `configs/task/smoke*.yaml` are cheap dev fixtures (tiny truncation, CN/BLiMP off) for exercising the pipeline end-to-end without real compute; they aren't experimental conditions.
 
 ---
 

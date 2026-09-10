@@ -1,0 +1,9 @@
+defaults:
+  - schema
+  - _self_
+
+# 1. NTP only (baseline)
+name: next_word
+data_path: ./data/base/nt_dataset
+model_save_path: ./models/pythia/nt-model
+num_train_epochs: 1

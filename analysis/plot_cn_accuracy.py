@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
-from data_utils import load_data, PARADIGM_ORDER, PALETTE, CHANCE
+from data_utils import load_data, PARADIGM_ORDER, PALETTE
 
 OUT = Path(__file__).parent.parent / "results"
 OUT.mkdir(exist_ok=True)

@@ -1,0 +1,12 @@
+defaults:
+  - schema
+  - _self_
+
+# Post-training NSP: stage 1. 4 epochs x ~24414 examples -> <=50M tokens
+name: ntp_100m_for_nsp
+data_path: ./data/split/nt_half_a
+model_save_path: ./models/pythia/ntp_100m_nsp_model
+num_train_epochs: 4
+train_truncation: 24414
+lock_epochs: true
+token_limit: 50000000
