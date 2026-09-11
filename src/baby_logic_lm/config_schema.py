@@ -15,6 +15,12 @@ from hydra.core.config_store import ConfigStore
 
 BASE_MODEL_ID = "EleutherAI/pythia-160m"
 RESULTS_CSV = "./training_results.csv"
+# Sidecar to RESULTS_CSV: one JSON object per run, same fields, but CN is
+# kept as a real nested structure instead of a stringified dict -- easier to
+# reslice/replot later without an ast.literal_eval round trip. Written
+# alongside the CSV by save_results(); the CSV remains the schema analysis/
+# depends on, this is purely additive.
+RESULTS_JSONL = "./training_results.jsonl"
 CN_DATA_PATH = "./evals/cn/crain-and-nakayama-breakdown.txt.data"
 BLIMP_DIR = "./evals/blimp_tests"
 

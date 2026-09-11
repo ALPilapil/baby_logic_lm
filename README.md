@@ -313,3 +313,13 @@ All evaluation results are appended to `training_results.csv`:
 | `BLiMP` | Average BLiMP suite accuracy |
 
 > **Note:** If you have a `training_results.csv` from before these columns were added, delete or rename it before running — new rows use a different header and will not align with old ones.
+
+**`training_results.jsonl`** — a sidecar written alongside the CSV with the same fields, one JSON object per line. The only difference is `CN`: the CSV stores it as a stringified Python dict (needs `ast.literal_eval` to read back, which `analysis/data_utils.py::parse_cn` already handles), while the JSONL keeps it as a real nested JSON object. Use whichever loads more naturally for a given plot — `pd.read_csv` / `pd.read_json(..., lines=True)` both work.
+
+**wandb** — every run also logs its full resolved config plus final CEL/perplexity/BLiMP/CN to your wandb project (`baby-logic-lm` by default) live during training, no waiting for a run to finish. To pull everything into a local, offline-plottable snapshot instead of the two files above:
+
+```bash
+python analysis/export_wandb.py                # writes results/wandb_runs.{csv,jsonl}
+```
+
+Note wandb auto-flattens the nested `CN` dict into individual scalar columns (`final/CN.<position>.<rank>`) — each is independently queryable/plottable, just spread across more columns than the single `CN` cell in `training_results.csv`.

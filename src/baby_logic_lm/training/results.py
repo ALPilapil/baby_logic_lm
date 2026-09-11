@@ -1,9 +1,16 @@
 import csv
+import json
 import logging
 import os
 from datetime import datetime, timezone
 
-from baby_logic_lm.config_schema import BASE_MODEL_ID, RESULTS_CSV, TaskConfig, TrainingConfig
+from baby_logic_lm.config_schema import (
+    BASE_MODEL_ID,
+    RESULTS_CSV,
+    RESULTS_JSONL,
+    TaskConfig,
+    TrainingConfig,
+)
 from baby_logic_lm.evaluation.evaluate import Evaluation
 
 logger = logging.getLogger(__name__)
@@ -17,6 +24,7 @@ def save_results(
     train_tokens: int,
     tag: str = "",
     filename: str = RESULTS_CSV,
+    jsonl_filename: str = RESULTS_JSONL,
 ):
     row = {
         "timestamp":    datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -42,3 +50,11 @@ def save_results(
             writer.writeheader()
         writer.writerow(row)
     logger.info("Results saved to %s", filename)
+
+    # Sidecar: same row, but CN stays a real nested dict (json.dumps handles
+    # the int keys by stringifying them, same as any JSON object) instead of
+    # a stringified Python repr -- avoids the ast.literal_eval round trip
+    # when reslicing/replotting this data later.
+    with open(jsonl_filename, "a") as f:
+        f.write(json.dumps(row) + "\n")
+    logger.info("Results saved to %s", jsonl_filename)

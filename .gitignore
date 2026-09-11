@@ -18,6 +18,11 @@ pythia/
 CLAUDE.md
 training_sesh2.txt
 
+# regenerable local pull-cache from analysis/export_wandb.py (live wandb
+# state, not a deliverable like the other results/ figures/tables)
+results/wandb_runs.csv
+results/wandb_runs.jsonl
+
 # python cache
 __pycache__/
 *.pyc
