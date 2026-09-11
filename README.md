@@ -193,6 +193,14 @@ python -m baby_logic_lm.cli.train -m task=ntp_10m,ntp_100m training.learning_rat
 
 ## Running Experiments
 
+Before kicking off a real (multi-hour) suite, run the smoke test to catch crashes and confirm CEL/perplexity/CN/BLiMP log correctly to `training_results.csv` and your wandb account:
+
+```bash
+bash scripts/smoke_test.sh
+```
+
+It trains 3 tiny fixtures (`configs/task/smoke_eval_pretrain.yaml`, `smoke_eval_finetune.yaml`, `smoke_split_phase.yaml`) covering checkpoint chaining, real CN/BLiMP scoring, and the split-phase/`token_limit` training path used by every 100M-suite condition — writes real, `smoke_check`-tagged rows/runs to your CSV and wandb project for you to inspect, verifies them automatically via `scripts/check_smoke_results.py`, and cleans up the disposable model checkpoints it creates.
+
 The simplest way to run all experiments is `run_train.sh` (training) and `run_eval.sh` (re-evaluation), which each cover both suites in order:
 
 ```bash

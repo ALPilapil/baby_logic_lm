@@ -1,0 +1,20 @@
+defaults:
+  - schema
+  - _self_
+
+# Heavier smoke tier (paired with smoke_eval_pretrain.yaml): run_cn/run_blimp
+# are ON with eval_truncation=12, so CN_test runs exactly one real 12-line
+# minimal set and BLiMP scores 12 of the 67 real test files -- exercising the
+# actual scoring + wandb.log(evaluation.CN) path a real run depends on, in a
+# couple of seconds instead of minutes. Not a real experimental condition --
+# see scripts/smoke_test.sh.
+name: smoke_eval_finetune
+data_path: ./data/split/nt_10m
+model_save_path: ./models/pythia/smoke_eval_finetune_model
+model_load_path: ./models/pythia/smoke_eval_pretrain_model
+num_train_epochs: 1
+train_truncation: 8
+test_truncation: 8
+run_cn: true
+run_blimp: true
+eval_truncation: 12

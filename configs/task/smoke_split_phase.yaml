@@ -1,0 +1,29 @@
+defaults:
+  - schema
+  - _self_
+
+# Heavier smoke tier: exercises baby_logic_lm.training.loop.train()'s
+# split-phase path (used by every real 100M-suite condition) -- N-1 full
+# epochs, then a truncated final epoch resumed from the latest checkpoint.
+# token_limit=6144 is chosen so the math is nontrivial at this tiny scale:
+#   tokens_per_epoch = train_truncation(8) * 512 = 4096
+#   full_epochs = num_train_epochs(2) - 1 = 1
+#   last_epoch_budget = 6144 - 1*4096 = 2048  ->  truncation = 2048 // 512 = 4
+# so phase 1 trains a full epoch (8 examples), phase 2 trains a truncated
+# epoch (4 examples). Note: at this scale (1 step/epoch, default
+# save_steps=5000) phase 1 won't actually write a checkpoint-* dir, so
+# resume_from_checkpoint is None and phase 2 continues from the in-memory
+# model object rather than a real on-disk restore -- this fixture proves the
+# code path doesn't crash, not that disk-based checkpoint resume works.
+# run_cn/run_blimp are off since smoke_eval_finetune.yaml already covers that
+# path. Not a real experimental condition -- see scripts/smoke_test.sh.
+name: smoke_split_phase
+data_path: ./data/split/nt_10m
+model_save_path: ./models/pythia/smoke_split_phase_model
+num_train_epochs: 2
+train_truncation: 8
+test_truncation: 8
+lock_epochs: true
+token_limit: 6144
+run_cn: false
+run_blimp: false

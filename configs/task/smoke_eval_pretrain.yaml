@@ -1,0 +1,17 @@
+defaults:
+  - schema
+  - _self_
+
+# Heavier smoke tier (paired with smoke_eval_finetune.yaml): proves a real
+# multi-hour suite run's checkpoint-chaining + CN/BLiMP wandb logging works
+# end-to-end, cheaply. Not a real experimental condition -- see
+# scripts/smoke_test.sh.
+name: smoke_eval_pretrain
+data_path: ./data/split/nt_5m_a
+model_save_path: ./models/pythia/smoke_eval_pretrain_model
+num_train_epochs: 1
+train_truncation: 8
+test_truncation: 8
+run_cn: false
+run_blimp: false
+is_pretrain: true
