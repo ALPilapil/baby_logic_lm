@@ -1,18 +1,20 @@
-# model related
-gpt-2-warm-up/
-models/
-wandb/
+# model related (repo-root only -- unanchored patterns here would also
+# match src/baby_logic_lm/models/ and src/baby_logic_lm/data/, silently
+# excluding real package source from git)
+/gpt-2-warm-up/
+/models/
+/wandb/
 
 # data
-pre-predata/
-next_token/
-next_sentence/
-next_utterance/
-tokenizers/
-data/
+/pre-predata/
+/next_token/
+/next_sentence/
+/next_utterance/
+/tokenizers/
+/data/
 
 # model stuff
-pythia/
+/pythia/
 
 # other
 CLAUDE.md
